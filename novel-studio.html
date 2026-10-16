@@ -51,6 +51,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .search::after{content:"";position:absolute;left:20px;top:58%;width:5px;height:1.6px;background:var(--muted);transform:rotate(45deg)}
 .side-btn{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;text-align:left;padding:8px 10px;border-radius:8px}
 .side-btn:hover{background:var(--hover)}
+a.side-btn{color:var(--ink);text-decoration:none;font-size:14px}
 .side-btn .ico{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--hover);font-size:13px;flex:0 0 22px}
 .side-btn.accent .ico{background:var(--accent);color:var(--accent-ink)}
 .works{flex:1;overflow:auto;margin-top:8px;padding-top:6px;border-top:1px solid var(--line)}
@@ -251,6 +252,7 @@ dialog h3{margin:0 0 8px;font-size:17px}
     <nav class="works" id="works" aria-label="作品一覧"></nav>
     <div class="side-foot">
       <button class="side-btn" id="importBtn"><span class="ico">↥</span>読み込み</button>
+      <a class="side-btn" id="claudeLink" href="https://claude.ai/artifact/FzbaQxMpD6wnzKSzsdb1DR" target="_blank" rel="noopener" title="APIキーなしで、claude.aiのアカウントで使う版を開きます"><span class="ico">✳</span>Claudeアカウント版を開く ↗</a>
       <button class="side-btn" id="syncBtn"><span class="ico">⇅</span>PC・スマホ同期</button>
       <button class="side-btn" id="settingsBtn"><span class="ico">⚙</span>AI接続設定</button>
     </div>
@@ -389,7 +391,7 @@ dialog h3{margin:0 0 8px;font-size:17px}
   <select id="sProvider">
     <option value="claudeai" id="optClaudeAI" hidden disabled>Claude（アカウント連携・APIキー不要）</option>
     <option value="openai">OpenAI互換（OpenRouter無料モデル / Ollama / LM Studio）</option>
-    <option value="claude">Claude API（Anthropic）</option>
+    <option value="claude">Claude API（有料のAPIキーが必要）</option>
   </select>
   <div class="hint" id="artifactHint" hidden>claude.ai上で開いているため、あなたのClaudeアカウントで執筆できます（利用量はClaudeのプランの上限から消費されます）。この画面では、APIキーを使う方式は通信が制限されるため使えません。</div>
   <div id="sClaudeAI" hidden>
@@ -836,7 +838,7 @@ async function* streamChat({system,messages,max,signal,webSearch}){
   if(prov()==='claudeai'){
     yield* sampleStream([{role:'user',content:system+'\n\n'+messages.map(m=>m.content).join('\n\n')}],signal);
   }else if(prov()==='claude'){
-    if(!s.key)throw new Error('Claude APIキーが入力されていません。\n\n・APIキーをお持ちなら、設定の「APIキー」欄に貼り付けてください（薄い文字は見本です）。\n・APIキーなしで使いたい場合は、claude.ai の公開ページ版を開いてください：\nhttps://claude.ai/artifact/FzbaQxMpD6wnzKSzsdb1DR');
+    if(!s.key){const e=new Error('Claude APIキーが入力されていません。');e.code='nokey';throw e}
     if(!s.key.startsWith('sk-ant-'))throw new Error('APIキーの形式が違うようです。sk-ant- で始まる文字列を貼り付けてください。');
     const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',signal,headers:{
       'content-type':'application/json','x-api-key':s.key,'anthropic-version':'2023-06-01',
@@ -866,10 +868,19 @@ async function* streamChat({system,messages,max,signal,webSearch}){
 async function run(label,args,onChunk){
   controller=new AbortController();lastAborted=false;busy(true);setStatus(label+'…');let text='';
   try{for await(const t of streamChat({...args,signal:controller.signal})){text+=t;onChunk&&onChunk(t,text)}}
-  catch(e){if(e.name!=='AbortError'){uiAlert(e.message,'AIエラー');throw e}lastAborted=true}
+  catch(e){if(e.name!=='AbortError'){e.code==='nokey'?noKeyHelp():uiAlert(e.message,'AIエラー');throw e}lastAborted=true}
   finally{controller=null;busy(false)}
   return text;
 }
+// Claude API が選ばれているのにキーがないとき：claude.ai版か無料の接続先へ案内する
+const ARTIFACT_URL='https://claude.ai/artifact/FzbaQxMpD6wnzKSzsdb1DR';
+async function noKeyHelp(){
+  const v=await uiDialog({title:'このページではClaudeのログインは使えません',
+    msg:'このページ（PC版・GitHub版）は claude.ai とは別のサイトなので、claude.ai にログインしていても、そのアカウントでは動かせません。\n\n・Claudeアカウントで書きたい → 「claude.ai版を開く」（APIキー不要。原稿はアカウントに保存されます）\n・このページで無料のAIを使う → 「無料のAIに切り替える」（OpenRouterのAPIキーが必要です）\n・Claude APIの有料キーを持っている → 「AI接続設定」でキーを入力',
+    buttons:[{label:'閉じる',value:null},{label:'無料のAIに切り替える',value:'free'},{label:'claude.ai版を開く',value:'open',primary:true}]});
+  if(v==='open')window.open(ARTIFACT_URL,'_blank','noopener');
+  else if(v==='free'){state.settings.provider='openai';if(!state.settings.base)state.settings.base=PRESETS.openrouter.base;save();setStatus(providerLabel());
+    $('settingsBtn').click();document.querySelector('[data-preset=openrouter]').click()}}
 function parseJSON(t){t=t.replace(/```(?:json)?/g,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a<0||b<a)throw new Error('AIの応答からJSONを読み取れませんでした:\n'+t.slice(0,300));return JSON.parse(t.slice(a,b+1))}
 
 // ---------- プロンプト（文脈）組み立て ----------
@@ -1228,7 +1239,7 @@ $('syOff').onclick=async()=>{if(!await uiConfirm('この端末での同期をや
   if(!chap())state.currentChapId=proj().chapters[0]?.id;
   applyDisplay();renderAll();setStatus(providerLabel());$('saved').textContent=store.mode==='cloud'?'アカウントに保存':'保存済み';
   // claude.ai 上ではアカウント保存で同期されるので、GitHub同期は使わない
-  if(ENV.artifact)$('syncBtn').hidden=true;
+  if(ENV.artifact){$('syncBtn').hidden=true;$('claudeLink').hidden=true}
   else{try{const sm=await kvGet('syncMeta');if(sm&&sm.repo===syncCfg().repo)syncMeta=sm.meta||{}}catch{}syncNow()}
   if(!ENV.artifact&&!state.settings.model&&state.settings.provider==='openai'&&!state.settings.key)setTimeout(()=>$('settingsBtn').click(),300);
 })();
