@@ -828,10 +828,11 @@ function updateMeta(){const g=validLastGen(),sel=getSel();
   $('cmeta').textContent=mode==='polish'
     ?(sel.text?`選択中の${sel.text.length}字を書き直します`:g?`直前の出力（${g.text.length}字）を消して書き直します`:'直前の出力がありません。本文の直したい部分を選択してください')
     :(g?`直前の出力 ${g.text.length}字 ・ 推敲モードで書き直せます`:'')}
-function setMode(m){mode=m;const b=$('modeBtn');b.textContent=(m==='write'?'執筆モード':'推敲モード')+' ∨';b.classList.toggle('polish',m==='polish');
+function setMode(m){mode=m;const b=$('modeBtn');b.textContent=(m==='write'?'執筆':'推敲')+(isMobile()?'':'モード')+' ∨';b.classList.toggle('polish',m==='polish');
   updatePlaceholder();document.querySelectorAll('[data-mode]').forEach(x=>x.classList.toggle('on',x.dataset.mode===m));updateMeta()}
 // 入力欄の例文（小説モードやキャラ名は画面に出さない）
-function updatePlaceholder(){$('prompt').placeholder=PH[mode]}
+function updatePlaceholder(){$('prompt').placeholder=isMobile()?(mode==='write'?'続きの展開を指示':'どう直す？'):PH[mode]}
+addEventListener('resize',()=>setMode(mode));
 function closePops(){document.querySelectorAll('.pop').forEach(x=>x.hidden=true)}
 $('plusBtn').onclick=e=>{e.stopPropagation();const h=$('plusMenu').hidden;closePops();$('plusMenu').hidden=!h};
 $('modeBtn').onclick=e=>{e.stopPropagation();const h=$('modeMenu').hidden;closePops();$('modeMenu').hidden=!h};
