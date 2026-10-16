@@ -1,0 +1,1032 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI小説スタジオ</title>
+<!--pwa--><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><meta name="theme-color" content="#faf9f5"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="AI小説"><!--/pwa-->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23c96442'/%3E%3Cpath d='M10 25c6.5-3.2 14-3 21 1.2V52c-7-4-14.5-4.2-21-1.2z' fill='%23fff'/%3E%3Cpath d='M54 25c-6.5-3.2-14-3-21 1.2V52c7-4 14.5-4.2 21-1.2z' fill='%23fff' fill-opacity='.82'/%3E%3Cpath d='M15 32.5h11M15 38h11M15 43.5h7' stroke='%23c96442' stroke-width='2.2' stroke-linecap='round'/%3E%3Cpath d='M47 6.5l1.9 5.1 5.1 1.9-5.1 1.9-1.9 5.1-1.9-5.1-5.1-1.9 5.1-1.9z' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+/* レイアウト：左に作品と章の一覧（チャットアプリのサイドバー風）、右に本文と入力欄 */
+:root{
+  --bg:#faf9f5; --side:#f0eee6; --panel:#ffffff; --ink:#1f1e1d; --muted:#73726c; --line:#e3e1d9;
+  --hover:#e8e6dd; --sel:#dedbd0; --accent:#c96442; --accent-ink:#ffffff; --danger:#b3392f;
+  --m-dream:#cf5f8a; --m-bl:#4f78c4;
+  --font-body:"Yu Mincho","Hiragino Mincho ProN","Noto Serif JP",serif;
+  --font-ui:"Yu Gothic UI","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#262624;--side:#1f1e1d;--panel:#30302e;--ink:#ecebe6;--muted:#9c9a92;--line:#3d3d3a;--hover:#34332f;--sel:#3d3c37;--accent:#d97757;--accent-ink:#ffffff;--danger:#e0705f;color-scheme:dark}
+}
+:root[data-theme="dark"]{--bg:#262624;--side:#1f1e1d;--panel:#30302e;--ink:#ecebe6;--muted:#9c9a92;--line:#3d3d3a;--hover:#34332f;--sel:#3d3c37;--accent:#d97757;--accent-ink:#ffffff;--danger:#e0705f;color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:14px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 12px}
+button:hover{background:var(--hover)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.primary:hover{filter:brightness(1.06);background:var(--accent)}
+button.danger{color:var(--danger)}
+button:disabled{opacity:.45;cursor:default}
+button.ghost{border-color:transparent;background:transparent}
+button.ghost:hover{background:var(--hover)}
+input,textarea,select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%}
+textarea{resize:vertical}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{flex:1}
+.hint{font-size:12px;color:var(--muted);line-height:1.6}
+
+.app{display:grid;grid-template-columns:272px 1fr;height:100%}
+
+/* サイドバー */
+.side{background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;padding:10px 8px}
+.brand{font-weight:700;font-size:15px;padding:6px 10px 10px;letter-spacing:.02em;display:flex;align-items:center;gap:10px}
+.brand .logo{width:28px;height:28px;flex:0 0 28px}
+.search{position:relative;margin:0 2px 6px}
+.search input{border-radius:10px;padding-left:30px;background:var(--panel)}
+.search::before{content:"";position:absolute;left:11px;top:50%;width:10px;height:10px;border:1.6px solid var(--muted);border-radius:50%;transform:translateY(-62%)}
+.search::after{content:"";position:absolute;left:20px;top:58%;width:5px;height:1.6px;background:var(--muted);transform:rotate(45deg)}
+.side-btn{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;text-align:left;padding:8px 10px;border-radius:8px}
+.side-btn:hover{background:var(--hover)}
+.side-btn .ico{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--hover);font-size:13px;flex:0 0 22px}
+.side-btn.accent .ico{background:var(--accent);color:var(--accent-ink)}
+.works{flex:1;overflow:auto;margin-top:8px;padding-top:6px;border-top:1px solid var(--line)}
+.sec{font-size:12px;color:var(--muted);padding:8px 10px 4px}
+.work-head{display:flex;align-items:center;gap:6px;padding:7px 8px 7px 10px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:13px}
+.work-head:hover{background:var(--hover);color:var(--ink)}
+.work.cur .work-head{color:var(--ink);font-weight:600}
+.work-head .wt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.work-head .chev{font-size:10px;width:10px}
+.work-head.on{background:var(--sel);color:var(--ink)}
+.mini{border:0;background:transparent;width:24px;height:24px;padding:0;border-radius:6px;color:var(--muted);visibility:hidden}
+.work-head:hover .mini,.work.cur .mini{visibility:visible}
+.mini:hover{background:var(--sel);color:var(--ink)}
+.chap{display:flex;flex-direction:column;padding:7px 10px 7px 26px;border-radius:8px;cursor:pointer}
+.chap:hover{background:var(--hover)}
+.chap.on{background:var(--sel)}
+.chap .ct{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chap .cn{font-size:11px;color:var(--muted)}
+.side-foot{border-top:1px solid var(--line);padding-top:6px;margin-top:6px}
+
+/* メイン */
+main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.topbar{display:flex;align-items:center;gap:4px;padding:8px 16px;position:relative}
+.wbtn{border:0;background:transparent;font-weight:600;font-size:15px;padding:6px 10px;border-radius:8px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topbar .sp{flex:1}
+.tool{border:0;background:transparent;width:36px;height:36px;padding:0;border-radius:8px;display:grid;place-items:center;color:var(--muted)}
+.tool:hover{background:var(--hover);color:var(--ink)}
+.tool svg{width:20px;height:20px}
+.tool.on{color:var(--accent)}
+.editor-wrap{flex:1;overflow:auto;display:flex;justify-content:center;padding:8px 24px 16px;min-height:0}
+.paper{width:100%;max-width:720px;display:flex;flex-direction:column;gap:6px;min-height:100%}
+#chapTitle{font-family:var(--font-body);font-size:22px;font-weight:600;border:0;background:transparent;padding:6px 0;border-radius:0}
+#chapTitle:focus-visible{outline:none;box-shadow:inset 0 -1px var(--line)}
+#body{flex:1;font-family:var(--font-body);font-size:17px;line-height:2;border:0;background:transparent;width:100%;min-height:360px;resize:none;outline:none;padding:0}
+#body.vertical{writing-mode:vertical-rl;min-height:0}
+.paper.vertical{max-width:none}
+
+/* 入力欄（チャットアプリ風） */
+.composer{padding:0 16px 6px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.cmeta{font-size:12px;color:var(--muted);min-height:16px;width:100%;max-width:760px;padding:0 14px}
+.cbox{position:relative;width:100%;max-width:760px;display:flex;align-items:flex-end;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:7px 7px 7px 8px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+.cbox:focus-within{border-color:var(--muted)}
+.cbox textarea{flex:1;min-width:0;border:0;background:transparent;resize:none;outline:none;padding:8px 4px;max-height:160px;line-height:1.5}
+.cbox textarea:focus-visible{outline:none}
+.cbox .icon{width:36px;height:36px;flex:0 0 36px;border:0;border-radius:50%;background:transparent;color:var(--muted);font-size:20px;padding:0;line-height:1}
+.cbox .icon:hover{background:var(--hover);color:var(--ink)}
+.cbox .chip{border:0;background:transparent;color:var(--muted);border-radius:10px;padding:8px 10px;white-space:nowrap;font-size:13px;height:36px}
+.cbox .chip:hover{background:var(--hover);color:var(--ink)}
+.cbox .chip.polish{color:var(--accent);font-weight:600}
+.cbox .send{width:36px;height:36px;flex:0 0 36px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-ink);font-size:18px;padding:0;font-weight:700}
+.cbox .send:hover{background:var(--accent);filter:brightness(1.06)}
+.cbox .send.stop{background:var(--ink);color:var(--bg);font-size:13px}
+.foot{display:flex;gap:14px;align-items:center;width:100%;max-width:760px;font-size:12px;color:var(--muted);padding:2px 14px 4px}
+.foot .sp{flex:1}
+.statusbtn{border:0;background:transparent;color:var(--muted);font-size:12px;padding:2px 6px}
+.statusbtn:hover{color:var(--ink);background:var(--hover)}
+
+/* ポップアップメニュー */
+.pop{position:absolute;bottom:calc(100% + 6px);left:0;z-index:5;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,.14);padding:6px;display:flex;flex-direction:column;gap:2px;min-width:250px}
+.pop-right{left:auto;right:0}
+.pop-down{bottom:auto;top:calc(100% + 2px);left:16px}
+.pop-label{font-size:12px;color:var(--muted);padding:6px 8px 2px}
+.pop-item{border:0;background:transparent;text-align:left;border-radius:10px;padding:9px 10px;display:flex;flex-direction:column;gap:2px}
+.pop-item:hover{background:var(--hover)}
+.pop-item span{font-size:12px;color:var(--muted)}
+.pop-item.on{background:var(--hover)}
+.pop-item.danger{color:var(--danger)}
+.pop hr{border:0;border-top:1px solid var(--line);margin:4px 6px}
+.seg{display:flex;gap:4px;padding:2px 4px 6px}
+.seg button{flex:1;border-radius:16px;padding:5px 0;font-size:12px}
+.seg button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+
+/* ダイアログ */
+dialog{border:1px solid var(--line);border-radius:16px;background:var(--panel);color:var(--ink);width:min(560px,94vw);padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+dialog::backdrop{background:rgba(20,20,19,.4)}
+dialog h3{margin:0 0 8px;font-size:17px}
+.dlg-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+
+/* 作品設定（本アイコン） */
+#bookDlg{width:min(860px,96vw);height:min(720px,92vh);padding:0}
+#bookDlg[open]{display:flex;flex-direction:column}
+.book-head{display:flex;align-items:center;gap:10px;padding:16px 20px 0}
+.book-head h3{margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btabs{display:flex;gap:4px;padding:12px 20px 0;border-bottom:1px solid var(--line)}
+.btabs button{border:0;border-radius:8px 8px 0 0;background:transparent;color:var(--muted);padding:8px 14px}
+.btabs button.on{color:var(--ink);box-shadow:inset 0 -2px var(--accent)}
+.bpane{flex:1;overflow:auto;padding:16px 20px 20px}
+.bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:12px}
+.bar .sp{flex:1}
+.fantype{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.switch-row{display:flex;align-items:center;gap:12px;margin-top:16px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;cursor:pointer;color:var(--ink);font-size:14px}
+.switch-row>span{flex:1;display:flex;flex-direction:column;gap:2px}
+.switch{appearance:none;-webkit-appearance:none;width:40px;height:24px;border-radius:12px;background:var(--sel);position:relative;cursor:pointer;flex:0 0 40px;padding:0;border:0;transition:background .15s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:left .15s}
+.switch:checked{background:var(--accent)}
+.switch:checked::after{left:19px}
+.fthead{display:flex;align-items:center;gap:8px}
+.fthead b{flex:1}
+.fthead button{font-size:12px;color:var(--muted)}
+/* 小説モード */
+.ftwrap{position:relative}
+.ftwrap .pop-down{left:0}
+.modechip{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 12px;font-size:12px;color:var(--ink);white-space:nowrap}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);flex:0 0 8px;margin-right:6px;vertical-align:middle}
+.modechip .dot{margin-right:0}
+.dot.dream{background:var(--m-dream)}.dot.bl{background:var(--m-bl)}.dot.other{background:var(--muted)}
+.work-head .dot{margin-right:0}
+.ftbox label{margin-top:6px}
+.ftgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0 10px}
+.cp{display:flex;align-items:center;gap:8px}
+.cp span{font-weight:700;color:var(--accent)}
+.egroup{margin-bottom:16px}
+.egroup h4{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600}
+.kind.canon{color:var(--accent)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.card{border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;background:var(--bg);display:flex;flex-direction:column;gap:6px;text-align:left}
+.card:hover{border-color:var(--muted)}
+.card .nm{font-weight:600}
+.card .ds{font-size:12px;color:var(--muted);line-height:1.6;overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;white-space:pre-wrap}
+.kind{display:inline-block;font-size:11px;padding:1px 8px;border-radius:10px;background:var(--hover);color:var(--muted);margin-right:6px;font-weight:400}
+.kind.character{color:var(--accent)}
+.empty{color:var(--muted);font-size:13px;padding:24px;text-align:center;border:1px dashed var(--line);border-radius:12px}
+.picklist{max-height:52vh;overflow:auto;margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:4px}
+.pg-head{font-size:12px;color:var(--muted);padding:10px 10px 4px;font-weight:600}
+.pick{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:start;padding:8px 10px;border-radius:8px;cursor:pointer;margin:0;font-size:14px;color:var(--ink)}
+.pick:hover{background:var(--hover)}
+.pick input{width:auto;margin-top:3px}
+.pick .pd{grid-column:2;font-size:12px;color:var(--muted);line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.pick .dup{font-size:11px;color:var(--danger);margin-left:6px}
+.chk{display:flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--ink)}
+.chk input{width:auto}
+#copyDlg,#canonDlg{width:min(640px,94vw)}
+.prow{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:start;padding:10px 0;border-bottom:1px solid var(--line)}
+.prow.cur .pnum{background:var(--accent);color:var(--accent-ink)}
+.pnum{width:26px;height:26px;border-radius:50%;background:var(--hover);display:grid;place-items:center;font-size:12px;margin-top:4px}
+.pmain{display:flex;flex-direction:column;gap:6px;min-width:0}
+.pmain .ptitle{font-weight:600}
+.pmain .psum{font-size:13px}
+.pmeta{font-size:11px;color:var(--muted)}
+.pacts{display:flex;flex-wrap:wrap;gap:2px;max-width:150px;justify-content:flex-end}
+.pacts button{padding:4px 8px;font-size:12px;border:0;background:transparent;color:var(--muted)}
+.pacts button:hover{background:var(--hover);color:var(--ink)}
+
+.menu-btn,.scrim{display:none}
+/* スマホ：サイドバーは隠しておき、☰ で左から引き出す */
+@media (max-width:760px){
+  .app{grid-template-columns:1fr}
+  .menu-btn{display:grid}
+  .side{position:fixed;z-index:30;top:0;bottom:0;left:0;width:min(300px,86vw);transform:translateX(-102%);transition:transform .22s ease,box-shadow .22s ease;visibility:hidden;
+    padding-top:calc(10px + env(safe-area-inset-top,0px));padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));padding-left:max(8px,env(safe-area-inset-left,0px))}
+  body.side-open .side{transform:none;visibility:visible;box-shadow:0 0 40px rgba(0,0,0,.25)}
+  .side{transition:transform .22s ease,visibility 0s linear .22s}
+  body.side-open .side{transition:transform .22s ease}
+  .scrim{display:block;position:fixed;inset:0;z-index:25;background:rgba(20,20,19,.4);opacity:0;pointer-events:none;transition:opacity .22s ease}
+  body.side-open .scrim{opacity:1;pointer-events:auto}
+  .topbar{padding:6px max(8px,env(safe-area-inset-right,0px)) 6px max(8px,env(safe-area-inset-left,0px))}
+  .wbtn{max-width:none;flex:0 1 auto;min-width:0}
+  .editor-wrap{padding-inline:max(16px,env(safe-area-inset-left,0px))}
+  .composer{padding-inline:max(10px,env(safe-area-inset-left,0px));padding-bottom:calc(6px + env(safe-area-inset-bottom,0px))}
+  .foot #total{display:none}
+  #bookDlg{width:100vw;height:100%;max-width:100vw;max-height:100%;border-radius:0;margin:0}
+  .bpane{padding-inline:16px}
+  .btabs{padding-inline:12px;overflow-x:auto}
+  .prow{grid-template-columns:28px 1fr}
+  .pacts{grid-column:2;max-width:none;justify-content:flex-start}
+}
+@media (prefers-reduced-motion:reduce){.side,.scrim{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scrim" id="scrim"></div>
+  <aside class="side" id="side">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--accent)"/><path d="M10 25c6.5-3.2 14-3 21 1.2V52c-7-4-14.5-4.2-21-1.2z" fill="#fff"/><path d="M54 25c-6.5-3.2-14-3-21 1.2V52c7-4 14.5-4.2 21-1.2z" fill="#fff" fill-opacity=".82"/><path d="M15 32.5h11M15 38h11M15 43.5h7" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"/><path d="M47 6.5l1.9 5.1 5.1 1.9-5.1 1.9-1.9 5.1-1.9-5.1-5.1-1.9 5.1-1.9z" fill="#fff"/></svg>
+      AI小説スタジオ
+    </div>
+    <div class="search"><input id="search" placeholder="作品・章を検索" aria-label="作品・章を検索"></div>
+    <button class="side-btn" id="newProj"><span class="ico">＋</span>新規作品</button>
+    <button class="side-btn accent" id="autoBtn"><span class="ico">✦</span>AIおまかせ執筆</button>
+    <nav class="works" id="works" aria-label="作品一覧"></nav>
+    <div class="side-foot">
+      <button class="side-btn" id="importBtn"><span class="ico">↥</span>読み込み</button>
+      <button class="side-btn" id="settingsBtn"><span class="ico">⚙</span>AI接続設定</button>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <button class="tool menu-btn" id="menuBtn" title="メニュー" aria-label="メニューを開く" aria-controls="side" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+      </button>
+      <button class="wbtn ghost" id="workMenuBtn" aria-haspopup="true"><span id="workName"></span> ∨</button>
+      <div class="pop pop-down" id="workMenu" hidden>
+        <button type="button" class="pop-item" data-wm="book">作品設定（キャラ・章立て）</button>
+        <button type="button" class="pop-item" data-wm="fork">この作品の設定で新規作品<span>キャラ・世界観・文体を引き継ぎます（本文は空）</span></button>
+        <button type="button" class="pop-item" data-wm="export">書き出し</button>
+        <hr>
+        <button type="button" class="pop-item danger" data-wm="delchap">この章を削除</button>
+        <button type="button" class="pop-item danger" data-wm="delproj">この作品を削除</button>
+      </div>
+      <span class="sp"></span>
+      <button class="tool" id="vertBtn" title="縦書きにする" aria-label="縦書き切替">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M16 4v16M11 4v16M6 4v10"/></svg>
+      </button>
+      <button class="tool" id="exportBtn" title="書き出し" aria-label="書き出し">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+      </button>
+      <button class="tool" id="bookBtn" title="作品設定（キャラ・世界観・章立て）" aria-label="作品設定">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11c.6 0 1 .4 1 1v15c0-.6-.4-1-1-1H5.5c-.8 0-1.5-.7-1.5-1.5z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13c-.6 0-1 .4-1 1v15c0-.6.4-1 1-1h5.5c.8 0 1.5-.7 1.5-1.5z"/></svg>
+      </button>
+    </div>
+    <div class="editor-wrap">
+      <div class="paper" id="paper">
+        <input id="chapTitle" placeholder="章タイトル" aria-label="章タイトル">
+        <textarea id="body" placeholder="ここに本文を書きます。下の入力欄からAIに続きを書かせることもできます。" aria-label="本文"></textarea>
+      </div>
+    </div>
+    <div class="composer">
+      <div class="cmeta" id="cmeta"></div>
+      <div class="cbox">
+        <div class="pop" id="plusMenu" hidden>
+          <div class="pop-label">1回に書く長さ</div>
+          <div class="seg" id="lenSeg">
+            <button type="button" data-len="400">400字</button><button type="button" data-len="800" class="on">800字</button><button type="button" data-len="1500">1500字</button><button type="button" data-len="3000">3000字</button>
+          </div>
+          <button type="button" class="pop-item" id="writeChapBtn">この章をあらすじから全文生成</button>
+        </div>
+        <div class="pop pop-right" id="modeMenu" hidden>
+          <button type="button" class="pop-item" data-mode="write"><b>執筆モード</b><span>本文の続きを書きます。指示は空欄でもOK</span></button>
+          <button type="button" class="pop-item" data-mode="polish"><b>推敲モード</b><span>直前の出力を消して、指示どおりに書き直します</span></button>
+        </div>
+        <button type="button" class="icon" id="plusBtn" title="その他の操作" aria-label="その他の操作">＋</button>
+        <textarea id="prompt" rows="1" aria-label="AIへの指示"></textarea>
+        <button type="button" class="chip" id="modeBtn" aria-haspopup="true">執筆モード ∨</button>
+        <button type="button" class="send" id="sendBtn" title="送信" aria-label="送信">↑</button>
+      </div>
+      <div class="foot"><span id="count">0字</span><span id="total"></span><span id="saved"></span><span class="sp"></span><button class="statusbtn" id="status" title="AI接続設定"></button></div>
+    </div>
+  </main>
+</div>
+
+<dialog id="bookDlg">
+  <div class="book-head"><h3 id="bookTitle">作品設定</h3><button class="tool" id="bookClose" aria-label="閉じる">✕</button></div>
+  <div class="btabs">
+    <button data-btab="entries" class="on">キャラ・設定</button>
+    <button data-btab="plot">章立て</button>
+    <button data-btab="work">作品情報</button>
+  </div>
+  <div class="bpane" id="bp-entries">
+    <div class="fantype">
+      <div class="fthead"><span class="dot" id="ftDot"></span><b id="ftHead">夢小説モードの設定</b><button type="button" class="ghost" id="ftChange">モードを変更</button></div>
+      <div class="ftbox" id="ftDream">
+        <div class="ftgrid">
+          <div><label for="dName">夢主の名前</label><input id="dName" placeholder="例：あなた（デフォルト名）"></div>
+          <div><label for="dFirst">夢主の一人称</label><input id="dFirst" placeholder="例：私"></div>
+          <div><label for="dPartner">お相手</label><input id="dPartner" list="charNames" placeholder="原作キャラの名前"></div>
+        </div>
+        <label for="dProfile">夢主の設定（任意）</label><textarea id="dProfile" rows="2" placeholder="例：主人公と同じ学校の後輩。明るいが人見知り。読者が自分を重ねやすいよう、細かく決めすぎないのがおすすめです"></textarea>
+      </div>
+      <div class="ftbox" id="ftBl" hidden>
+        <label>カップリング（左が攻め・右が受け）</label>
+        <div class="cp"><input id="bSeme" list="charNames" placeholder="攻め" aria-label="攻め"><span>×</span><input id="bUke" list="charNames" placeholder="受け" aria-label="受け"></div>
+        <label for="bNotes">関係性のメモ（任意）</label><textarea id="bNotes" rows="2" placeholder="例：幼なじみ。両片想いからのじれじれ"></textarea>
+      </div>
+      <div class="ftbox hint" id="ftOther" hidden>夢主やカップリングの設定は使いません。夢小説・腐小説を書くときは、画面上部のモード切替か「モードを変更」から切り替えてください。</div>
+      <datalist id="charNames"></datalist>
+    </div>
+    <div class="bar">
+      <button data-add="canon">＋ 原作キャラ</button>
+      <button data-add="original">＋ オリキャラ</button>
+      <button data-add="world">＋ 世界観</button>
+      <button data-add="term">＋ 用語</button>
+      <span class="sp"></span>
+      <button id="copyBtn" title="別の作品に登録したキャラ・設定を、この作品に複製します">⧉ 他の作品からコピー</button>
+      <button id="canonBtn" class="needs-idle" title="二次創作向け：原作のキャラ・設定をまとめて取り込みます">⌕ 原作から取り込み</button>
+      <button id="genEntries" class="needs-idle">✦ AIで提案</button>
+    </div>
+    <div id="entryList"></div>
+  </div>
+  <div class="bpane" id="bp-plot" hidden>
+    <div class="bar">
+      <button id="addChap">＋ 章を追加</button>
+      <span class="sp"></span>
+      <input id="plotN" type="number" value="8" min="1" max="50" style="width:70px" aria-label="章の数"><span class="hint">章で</span>
+      <button id="genPlot" class="needs-idle">✦ AIで章立てを生成</button>
+    </div>
+    <div class="hint">各章のあらすじは、AIが本文を書くときの指示として使われます。</div>
+    <div id="plotList"></div>
+  </div>
+  <div class="bpane" id="bp-work" hidden>
+    <label for="wTitle">タイトル</label><input id="wTitle">
+    <label for="wGenre">ジャンル</label><input id="wGenre" placeholder="例：ファンタジー、ミステリー">
+    <label for="wStyle">文体・トーン</label><textarea id="wStyle" rows="3" placeholder="例：一人称、軽妙、会話多め、ですます調は使わない"></textarea>
+    <label for="wSynopsis">全体のあらすじ</label><textarea id="wSynopsis" rows="7"></textarea>
+    <label for="wNotes">メモ（AIにも渡されます）</label><textarea id="wNotes" rows="3"></textarea>
+    <label class="switch-row" for="wNoChap">
+      <span><b>章を使わない</b><span class="hint">短編・一話完結向け。本文を1つの文章として書きます</span></span>
+      <input type="checkbox" id="wNoChap" class="switch">
+    </label>
+  </div>
+</dialog>
+
+<dialog id="settingsDlg">
+  <h3>AI接続設定</h3>
+  <label>プロバイダ</label>
+  <select id="sProvider">
+    <option value="claudeai" id="optClaudeAI" hidden disabled>Claude（アカウント連携・APIキー不要）</option>
+    <option value="openai">OpenAI互換（OpenRouter無料モデル / Ollama / LM Studio）</option>
+    <option value="claude">Claude API（Anthropic）</option>
+  </select>
+  <div class="hint" id="artifactHint" hidden>claude.ai上で開いているため、あなたのClaudeアカウントで執筆できます（利用量はClaudeのプランの上限から消費されます）。この画面では、APIキーを使う方式は通信が制限されるため使えません。</div>
+  <div id="sClaudeAI" hidden>
+    <label>モデルの種類</label>
+    <select id="sTier">
+      <option value="default">標準（バランス）</option>
+      <option value="complex">高性能（遅いが丁寧）</option>
+      <option value="quick">高速（短い作業向け）</option>
+    </select>
+  </div>
+  <div id="sLocal">
+    <label>接続先プリセット</label>
+    <div class="row">
+      <button type="button" data-preset="openrouter">OpenRouter（無料）</button>
+      <button type="button" data-preset="ollama">Ollama</button>
+      <button type="button" data-preset="lmstudio">LM Studio</button>
+    </div>
+    <label>ベースURL</label>
+    <input id="sBase" placeholder="https://openrouter.ai/api/v1">
+    <div class="hint" id="presetHint">OpenRouter: https://openrouter.ai/api/v1 ／ Ollama: http://localhost:11434/v1 ／ LM Studio: http://localhost:1234/v1</div>
+    <label>モデル</label>
+    <div class="row"><select id="sModelSel"><option value="">「一覧取得」を押すとここから選べます</option></select><button id="fetchModels" style="flex:0 0 auto">一覧取得</button></div>
+    <input id="sModel" placeholder="モデル名（直接入力も可） 例：qwen3:4b" style="margin-top:6px">
+    <div class="hint" id="modelHint"></div>
+    <label>APIキー（OpenRouterは必須・ローカルは空欄）</label><input id="sLocalKey" type="password" placeholder="sk-or-...">
+    <label>温度（創造性）</label><input id="sTemp" type="number" step="0.1" min="0" max="2">
+  </div>
+  <div id="sClaude">
+    <div class="hint">⚠ 有料のAPIキーが必要です（platform.claude.com で発行）。APIキーなしでClaudeを使いたい場合は、claude.ai の公開ページ版を使ってください：<br><span style="user-select:all">https://claude.ai/artifact/FzbaQxMpD6wnzKSzsdb1DR</span></div>
+    <label>APIキー</label><input id="sKey" type="password" placeholder="ここにAPIキーを貼り付け（sk-ant- で始まる文字列）">
+    <div class="hint">キーはこのブラウザ内（IndexedDB）にのみ保存され、api.anthropic.com への送信にだけ使われます。</div>
+    <label>モデル</label>
+    <select id="sCModel">
+      <option value="claude-opus-5-5">Claude Opus 5.5（高品質）</option>
+      <option value="claude-sonnet-5-5">Claude Sonnet 5.5（バランス）</option>
+      <option value="claude-haiku-5-5">Claude Haiku 5.5（高速・低価格）</option>
+    </select>
+    <label>思考の深さ（effort）</label>
+    <select id="sEffort"><option value="low">low（速い）</option><option value="medium">medium</option><option value="high">high（丁寧）</option></select>
+  </div>
+  <div id="sMaxWrap"><label>最大出力トークン</label><input id="sMax" type="number" min="256" step="256"></div>
+  <div class="dlg-actions"><button id="testConn">接続テスト</button><button id="sClose" class="primary">保存して閉じる</button></div>
+</dialog>
+
+<dialog id="autoDlg">
+  <h3>AIおまかせ執筆</h3>
+  <div class="hint">テーマを入れると、AIが作品設定・登場人物・章立てを作り、各章の本文を順に書き進めます。途中で入力欄の ■ で止められます。</div>
+  <label>テーマ・アイデア</label>
+  <textarea id="aTheme" rows="4" placeholder="例：記憶を売買できる街で、自分の記憶を買い戻そうとする少女の話"></textarea>
+  <div class="row">
+    <div><label>ジャンル</label><input id="aGenre" placeholder="任意"></div>
+    <div><label>章数</label><input id="aN" type="number" value="5" min="1" max="30"></div>
+    <div><label>1章の字数</label><input id="aLen" type="number" value="2000" step="500" min="500"></div>
+  </div>
+  <label>文体の希望</label><input id="aStyle" placeholder="任意。例：三人称、静かで叙情的">
+  <label><input type="checkbox" id="aPlanOnly" style="width:auto"> 設定と章立てだけ作る（本文は書かない）</label>
+  <div class="dlg-actions"><button id="aCancel">キャンセル</button><button id="aGo" class="primary">開始</button></div>
+</dialog>
+
+<dialog id="entryDlg">
+  <h3 id="eHead">設定</h3>
+  <label>種類</label>
+  <select id="eKind"><option value="canon">原作キャラ</option><option value="original">オリジナルキャラ</option><option value="world">世界観</option><option value="term">用語</option></select>
+  <label>名前</label><input id="eName">
+  <label>説明（性格・外見・口調・関係性など）</label><textarea id="eDesc" rows="9"></textarea>
+  <div class="dlg-actions"><button id="eDel" class="danger">削除</button><span style="flex:1"></span><button id="eCancel">キャンセル</button><button id="eSave" class="primary">保存</button></div>
+</dialog>
+
+<dialog id="copyDlg">
+  <h3>他の作品から設定をコピー</h3>
+  <div class="hint">チェックしたキャラ・設定を、いま開いている作品に複製します。元の作品の設定はそのまま残ります。</div>
+  <div class="picklist" id="copyList"></div>
+  <div class="dlg-actions"><label class="chk"><input type="checkbox" id="copyAll"> すべて選択</label><span style="flex:1"></span><button id="copyCancel">キャンセル</button><button id="copyGo" class="primary">コピーする</button></div>
+</dialog>
+
+<dialog id="canonDlg">
+  <h3>原作から設定を取り込む（二次創作向け）</h3>
+  <div id="canonForm">
+    <label for="cWork">原作のタイトル</label><input id="cWork" placeholder="例：作品名（シリーズ名でも可）">
+    <label for="cNames">取り込みたいキャラ・設定（任意・「、」区切り）</label><input id="cNames" placeholder="空欄なら主要キャラと重要な設定をまとめて取り込みます">
+    <label for="cRef">参考テキスト（任意）</label><textarea id="cRef" rows="6" placeholder="Wikiや公式サイトのキャラ紹介などを貼り付けると、その内容を優先して正確にまとめます"></textarea>
+    <div class="hint" id="canonHint" style="margin-top:8px"></div>
+    <div class="dlg-actions"><button id="canonCancel">キャンセル</button><button id="canonGo" class="primary needs-idle">調べてまとめる</button></div>
+  </div>
+  <div id="canonResult" hidden>
+    <div class="hint">追加する項目を選んでください。内容は追加したあとでも編集できます。</div>
+    <div class="picklist" id="canonList"></div>
+    <div class="dlg-actions"><button id="canonBack">やり直す</button><span style="flex:1"></span><button id="canonAdd" class="primary">選んだ項目を追加</button></div>
+  </div>
+</dialog>
+
+<dialog id="msgDlg">
+  <h3 id="mTitle"></h3>
+  <div id="mMsg" class="hint" style="white-space:pre-wrap;font-size:13px;color:var(--ink)"></div>
+  <input id="mInput" hidden style="margin-top:10px">
+  <div class="dlg-actions" id="mBtns"></div>
+</dialog>
+
+<input type="file" id="fileIn" accept=".json" hidden>
+
+<script>
+// ---------- 保存（IndexedDB） ----------
+const DB_NAME = 'ai-novel-studio', STORE = 'kv';
+function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function kvGet(k){const db=await idb();return new Promise((res,rej)=>{const r=db.transaction(STORE).objectStore(STORE).get(k);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function kvSet(k,v){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction(STORE,'readwrite');t.objectStore(STORE).put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})}
+
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const KIND={character:'人物',world:'世界観',term:'用語'};
+// 人物は origin で「原作キャラ(canon)」と「オリキャラ(original)」に分ける
+const isCanon=e=>e.kind==='character'&&e.origin==='canon';
+const kindLabel=e=>e.kind==='character'?(isCanon(e)?'原作キャラ':'オリキャラ'):(KIND[e.kind]||e.kind);
+const kindCls=e=>e.kind==='character'?(isCanon(e)?'canon':'character'):e.kind;
+const FT={dream:'夢小説モード',bl:'腐小説モード',other:'その他の小説モード'};
+const fanType=p=>p.fanType||'dream';
+
+let state={projects:[],currentId:null,currentChapId:null,settings:{
+  provider:'openai',base:'https://openrouter.ai/api/v1',model:'',localKey:'',temp:0.8,
+  key:'',cModel:'claude-opus-5-5',effort:'medium',max:4096
+}};
+// ---------- ページ内ダイアログ（alert/confirm/prompt の代わり） ----------
+function uiDialog({title='',msg='',input=null,buttons=[{label:'OK',value:true,primary:true}]}){
+  return new Promise(res=>{const d=$('msgDlg');$('mTitle').textContent=title;$('mMsg').textContent=msg;
+    const inp=$('mInput');inp.hidden=input===null;inp.value=input??'';
+    $('mBtns').innerHTML='';
+    for(const b of buttons){const el=document.createElement('button');el.textContent=b.label;if(b.primary)el.className='primary';
+      el.onclick=()=>{d.close();res(b.value==='__input'?inp.value:b.value)};$('mBtns').append(el)}
+    d.oncancel=e=>{e.preventDefault();d.close();res(input===null?false:null)};
+    d.showModal();if(input!==null)inp.focus()})}
+const uiAlert=(msg,title='お知らせ')=>uiDialog({title,msg});
+const uiConfirm=(msg,ok='OK',title='確認')=>uiDialog({title,msg,buttons:[{label:'キャンセル',value:false},{label:ok,value:true,primary:true}]});
+
+// ---------- 保存先：ローカル(IndexedDB) か claude.ai のアカウント保存(db) ----------
+const ENV={artifact:false,sample:null,downloads:null};
+let store={mode:'local'};
+async function initEnv(){
+  if(!window.claude)return;
+  const [sample,db,user,downloads]=await Promise.all(['sample','db','user','downloads'].map(n=>claude.use(n).catch(()=>null)));
+  ENV.sample=sample;ENV.downloads=downloads;ENV.artifact=!!sample;
+  const id=db&&user?await user.id().catch(()=>null):null;
+  if(db&&id)store={mode:'cloud',col:db.collection('data/users/'+id),last:{}};
+}
+function toDocs(){
+  const docs={settings:{settings:{...state.settings,key:'',localKey:''},currentId:state.currentId,currentChapId:state.currentChapId,order:state.projects.map(p=>p.id)}};
+  for(const p of state.projects){
+    docs['p_'+p.id]={id:p.id,title:p.title,genre:p.genre,style:p.style,synopsis:p.synopsis,notes:p.notes||'',entries:p.entries,updated:p.updated||0,
+      fanType:fanType(p),dream:p.dream||{},bl:p.bl||{},noChapters:!!p.noChapters,
+      chapters:p.chapters.map(c=>({id:c.id,title:c.title,summary:c.summary}))};
+    for(const c of p.chapters)docs['c_'+c.id]={pid:p.id,body:c.body};
+  }
+  return docs;
+}
+async function loadState(){
+  if(store.mode==='cloud'){
+    const snap=await store.col.limit(1000).get();const m={};
+    for(const d of snap.docs){m[d.id]=d.data();store.last[d.id]=JSON.stringify(d.data())}
+    if(!m.settings)return null;
+    const projects=[];
+    for(const pid of m.settings.order||[]){const p=m['p_'+pid];if(!p)continue;
+      projects.push({...p,entries:[...(p.entries||[])].map(e=>({...e})),chapters:(p.chapters||[]).map(c=>({...c,body:m['c_'+c.id]?.body||''}))})}
+    return {projects,currentId:m.settings.currentId,currentChapId:m.settings.currentChapId,settings:{...m.settings.settings}};
+  }
+  return await kvGet('state');
+}
+let flushing=false,flushAgain=false;
+async function flush(){
+  if(store.mode!=='cloud'){await kvSet('state',state);return}
+  if(flushing){flushAgain=true;return}
+  flushing=true;
+  try{do{flushAgain=false;const docs=toDocs();
+    for(const [k,v] of Object.entries(docs)){const j=JSON.stringify(v);if(store.last[k]!==j){await store.col.doc(k).set(v);store.last[k]=j}}
+    for(const k of Object.keys(store.last))if(!(k in docs)){await store.col.doc(k).delete();delete store.last[k]}
+  }while(flushAgain)}finally{flushing=false}
+}
+let saveTimer=null;
+function save(){clearTimeout(saveTimer);$('saved').textContent='未保存…';saveTimer=setTimeout(async()=>{
+  try{await flush();$('saved').textContent=store.mode==='cloud'?'保存済み（アカウント）':'保存済み'}
+  catch(e){$('saved').textContent='保存失敗: '+(e.message||e.code);if(e.code==='invalid_argument')uiAlert('1つの章が長すぎて保存できませんでした。章を2つに分けてください。')}
+},store.mode==='cloud'?1000:500)}
+
+const proj=()=>state.projects.find(p=>p.id===state.currentId);
+const chap=()=>{const p=proj();return p&&p.chapters.find(c=>c.id===state.currentChapId)};
+const newChapter=p=>({id:uid(),title:`第${p.chapters.length+1}章`,summary:'',body:''});
+function newProject(data={}){
+  const p={id:uid(),title:data.title||'無題の作品',genre:data.genre||'',style:data.style||'',synopsis:data.synopsis||'',notes:'',entries:[],chapters:[],updated:Date.now(),
+    fanType:data.fanType||'dream',dream:{...(data.dream||{})},bl:{...(data.bl||{})}};
+  p.chapters.push(newChapter(p));
+  state.projects.unshift(p);state.currentId=p.id;state.currentChapId=p.chapters[0].id;return p;
+}
+function selectChapter(pid,cid){state.currentId=pid;const p=proj();state.currentChapId=cid||p.chapters[0]?.id;renderAll();save()}
+
+// ---------- 描画 ----------
+function renderAll(){renderSidebar();renderTop();renderEditor();updatePlaceholder();if($('bookDlg').open)renderBook()}
+function renderSidebar(){
+  const q=$('search').value.trim();
+  const list=state.projects.filter(p=>!q||p.title.includes(q)||p.chapters.some(c=>c.title.includes(q)));
+  $('works').innerHTML=(list.length?'<div class="sec">作品</div>':'<div class="sec">見つかりません</div>')+list.map(p=>{
+    const cur=p.id===state.currentId;
+    if(p.noChapters)return `<div class="work ${cur?'cur':''}"><div class="work-head single ${cur?'on':''}" data-pid="${p.id}"><span class="chev"></span><span class="wt">${esc(p.title)}</span></div></div>`;
+    const open=cur||!!q;
+    const chs=open?p.chapters.filter(c=>!q||p.title.includes(q)||c.title.includes(q)):[];
+    return `<div class="work ${cur?'cur':''}">
+      <div class="work-head" data-pid="${p.id}"><span class="chev">${open?'▾':'▸'}</span><span class="wt">${esc(p.title)}</span><button class="mini" data-addchap="${p.id}" title="章を追加" aria-label="章を追加">＋</button></div>
+      ${chs.map(c=>`<div class="chap ${c.id===state.currentChapId?'on':''}" data-pid="${p.id}" data-cid="${c.id}"><span class="ct">${esc(c.title||'無題')}</span><span class="cn">${c.body.length.toLocaleString()}字</span></div>`).join('')}
+    </div>`}).join('');
+  const p=proj();if(p)$('total').textContent=`作品合計 ${p.chapters.reduce((a,c)=>a+c.body.length,0).toLocaleString()}字`;
+}
+// 小説モードはプライベートな情報なので、メイン画面には表示しない（📖 作品設定の中だけで扱う）
+function renderTop(){const p=proj();if(!p)return;$('workName').textContent=p.title}
+// 互換：生成処理などから呼ばれる
+function renderChapters(){renderSidebar();if($('bookDlg').open&&!$('bp-plot').hidden&&!$('plotList').contains(document.activeElement))renderPlot()}
+function renderEntries(){if($('bookDlg').open)renderEntryCards()}
+const noChap=()=>!!proj()?.noChapters;
+function renderEditor(){const c=chap(),nc=noChap();$('chapTitle').value=c?c.title:'';$('chapTitle').hidden=nc;$('body').value=c?c.body:'';
+  // 章なしの作品では、章に関する操作を隠す
+  document.querySelector('[data-wm="delchap"]').hidden=nc;$('writeChapBtn').textContent=nc?'あらすじから全文を生成':'この章をあらすじから全文生成';
+  updateCount();updateMeta()}
+function updateCount(){$('count').textContent=`${noChap()?'本文':'この章'} ${$('body').value.length.toLocaleString()}字`;$('total').hidden=noChap()}
+function setStatus(t){$('status').textContent=t}
+
+// 作品設定モーダル
+function renderBook(){const p=proj();$('bookTitle').textContent=p.title;
+  $('wTitle').value=p.title;$('wGenre').value=p.genre;$('wStyle').value=p.style;$('wSynopsis').value=p.synopsis;$('wNotes').value=p.notes||'';
+  $('wNoChap').checked=!!p.noChapters;document.querySelector('[data-btab="plot"]').hidden=!!p.noChapters;
+  if(p.noChapters&&!$('bp-plot').hidden)showBtab('work');
+  renderEntryCards();renderPlot()}
+// 章なし設定の切り替え
+$('wNoChap').onchange=async e=>{const p=proj(),on=e.target.checked;
+  if(on&&p.chapters.length>1){
+    const ok=await uiConfirm(`この作品には${p.chapters.length}個の章があります。すべての章の本文を、章の順番どおり1つの文章にまとめます。\n（章タイトルとあらすじは消えます）`,'まとめる','章を使わない');
+    if(!ok){e.target.checked=false;return}
+    const merged=p.chapters.map(c=>c.body.trim()).filter(Boolean).join('\n\n');
+    p.chapters=[{...p.chapters[0],title:'本文',summary:'',body:merged}];
+  }
+  p.noChapters=on;state.currentChapId=p.chapters[0].id;lastGen=null;renderAll();renderBook();save()};
+function renderEntryCards(){const p=proj();
+  renderFanType();
+  const card=e=>`<button type="button" class="card" data-id="${e.id}"><div class="nm"><span class="kind ${kindCls(e)}">${kindLabel(e)}</span>${esc(e.name)}</div><div class="ds">${esc(e.desc||'（説明なし）')}</div></button>`;
+  const groups=[['原作キャラクター',e=>isCanon(e)],['オリジナルキャラクター',e=>e.kind==='character'&&!isCanon(e)],['世界観・用語',e=>e.kind!=='character']];
+  $('entryList').innerHTML=p.entries.length?groups.map(([h,f])=>{const es=p.entries.filter(f);return es.length?`<div class="egroup"><h4>${h}（${es.length}）</h4><div class="cards">${es.map(card).join('')}</div></div>`:''}).join('')
+    :'<div class="empty">登場人物や世界観を登録すると、AIが執筆するときに参照します。<br>「⌕ 原作から取り込み」で原作キャラをまとめて登録するか、「＋ 原作キャラ」「＋ オリキャラ」から追加してください。</div>';
+  $('charNames').innerHTML=p.entries.filter(e=>e.kind==='character').map(e=>`<option value="${esc(e.name)}">`).join('');
+}
+// 夢／腐／それ以外
+function renderFanType(){const p=proj(),ft=fanType(p);p.dream=p.dream||{};p.bl=p.bl||{};
+  $('ftHead').textContent=FT[ft]+(ft==='other'?'':'の設定');$('ftDot').className='dot '+ft;
+  $('ftDream').hidden=ft!=='dream';$('ftBl').hidden=ft!=='bl';$('ftOther').hidden=ft!=='other';
+  $('dName').value=p.dream.name||'';$('dFirst').value=p.dream.first||'';$('dPartner').value=p.dream.partner||'';$('dProfile').value=p.dream.profile||'';
+  $('bSeme').value=p.bl.seme||'';$('bUke').value=p.bl.uke||'';$('bNotes').value=p.bl.notes||'';
+}
+function setFanType(ft){proj().fanType=ft;renderTop();renderSidebar();updatePlaceholder();if($('bookDlg').open)renderFanType();save()}
+$('ftChange').onclick=e=>{e.stopPropagation();const p=proj(),order=['dream','bl','other'];
+  uiDialog({title:'小説モードを変更',msg:'この作品のモードを選んでください。',buttons:order.filter(k=>k!==fanType(p)).map(k=>({label:FT[k],value:k})).concat([{label:'キャンセル',value:null}])}).then(v=>{if(v)setFanType(v)})};
+[['dName','dream','name'],['dFirst','dream','first'],['dPartner','dream','partner'],['dProfile','dream','profile'],['bSeme','bl','seme'],['bUke','bl','uke'],['bNotes','bl','notes']]
+  .forEach(([id,g,k])=>$(id).oninput=e=>{const p=proj();p[g]=p[g]||{};p[g][k]=e.target.value;updatePlaceholder();save()});
+function renderPlot(){const p=proj();
+  $('plotList').innerHTML=p.chapters.map((c,i)=>`<div class="prow ${c.id===state.currentChapId?'cur':''}" data-cid="${c.id}">
+    <div class="pnum">${i+1}</div>
+    <div class="pmain"><input class="ptitle" value="${esc(c.title)}" aria-label="章タイトル"><textarea class="psum" rows="2" placeholder="この章で起きること（AIへの指示になります）" aria-label="あらすじ">${esc(c.summary)}</textarea><div class="pmeta">${c.body.length.toLocaleString()}字</div></div>
+    <div class="pacts"><button data-act="open">開く</button><button data-act="sum" class="needs-idle" ${controller?'disabled':''}>本文から要約</button><button data-act="up" aria-label="上へ">↑</button><button data-act="down" aria-label="下へ">↓</button><button data-act="del" class="danger">削除</button></div>
+  </div>`).join('');
+}
+
+// ---------- UI イベント ----------
+$('search').oninput=renderSidebar;
+// スマホ：☰ でサイドバーを開閉
+const isMobile=()=>matchMedia('(max-width:760px)').matches;
+function setSide(open){document.body.classList.toggle('side-open',open);$('menuBtn').setAttribute('aria-expanded',String(open))}
+$('menuBtn').onclick=e=>{e.stopPropagation();setSide(!document.body.classList.contains('side-open'))};
+$('scrim').onclick=()=>setSide(false);
+$('side').addEventListener('click',e=>{if(isMobile()&&e.target.closest('.chap,.work-head.single,[data-addchap],#newProj,#autoBtn,#importBtn,#settingsBtn'))setSide(false)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')setSide(false)});
+$('works').onclick=e=>{
+  const add=e.target.closest('[data-addchap]');
+  if(add){state.currentId=add.dataset.addchap;const p=proj(),c=newChapter(p);p.chapters.push(c);selectChapter(p.id,c.id);$('chapTitle').focus();return}
+  const ch=e.target.closest('.chap');if(ch){selectChapter(ch.dataset.pid,ch.dataset.cid);return}
+  const h=e.target.closest('.work-head');if(h&&h.dataset.pid!==state.currentId)selectChapter(h.dataset.pid);
+};
+$('newProj').onclick=()=>{newProject();renderAll();save();openBook('work');$('wTitle').select()};
+$('chapTitle').oninput=e=>{chap().title=e.target.value;renderSidebar();save()};
+$('body').oninput=e=>{chap().body=e.target.value;updateCount();save()};
+$('vertBtn').onclick=()=>{const v=$('body').classList.toggle('vertical');$('paper').classList.toggle('vertical',v);$('vertBtn').classList.toggle('on',v);$('vertBtn').title=v?'横書きに戻す':'縦書きにする'};
+$('status').onclick=()=>$('settingsBtn').click();
+
+// 作品メニュー
+$('workMenuBtn').onclick=e=>{e.stopPropagation();const h=$('workMenu').hidden;closePops();$('workMenu').hidden=!h};
+$('workMenu').onclick=async e=>{const b=e.target.closest('[data-wm]');if(!b)return;closePops();
+  const a=b.dataset.wm;
+  if(a==='book')openBook();
+  else if(a==='fork'){const src=proj();const p=newProject({title:src.title+'（新作）',genre:src.genre,style:src.style,fanType:fanType(src),dream:src.dream,bl:src.bl});
+    p.entries=src.entries.map(e=>({id:uid(),kind:e.kind,origin:e.origin,name:e.name,desc:e.desc}));p.noChapters=!!src.noChapters;renderAll();save();openBook('work');$('wTitle').select();setStatus(`設定を${p.entries.length}件引き継ぎました`)}
+  else if(a==='export')$('exportBtn').click();
+  else if(a==='delchap')deleteChapter(chap().id);
+  else if(a==='delproj'){const p=proj();if(!await uiConfirm(`「${p.title}」を削除しますか？（元に戻せません）`,'削除する'))return;
+    state.projects=state.projects.filter(x=>x!==p);if(!state.projects.length)newProject();selectChapter(state.projects[0].id)}};
+async function deleteChapter(cid){const p=proj(),c=p.chapters.find(x=>x.id===cid);if(!c||!await uiConfirm(`「${c.title}」を削除しますか？`,'削除する'))return;
+  const i=p.chapters.indexOf(c);p.chapters.splice(i,1);if(!p.chapters.length)p.chapters.push(newChapter(p));
+  if(state.currentChapId===cid)state.currentChapId=p.chapters[Math.max(0,i-1)].id;renderAll();save()}
+
+// 作品設定モーダル（本アイコン）
+function openBook(tab){renderBook();if(tab)showBtab(tab);if(!$('bookDlg').open)$('bookDlg').showModal()}
+function showBtab(t){document.querySelectorAll('[data-btab]').forEach(x=>x.classList.toggle('on',x.dataset.btab===t));['entries','plot','work'].forEach(k=>$('bp-'+k).hidden=k!==t)}
+$('bookBtn').onclick=()=>openBook();
+$('bookClose').onclick=()=>{$('bookDlg').close();renderAll()};
+$('bookDlg').addEventListener('close',()=>renderAll());
+document.querySelectorAll('[data-btab]').forEach(b=>b.onclick=()=>{showBtab(b.dataset.btab);if(b.dataset.btab==='plot')renderPlot()});
+[['wTitle','title'],['wGenre','genre'],['wStyle','style'],['wSynopsis','synopsis'],['wNotes','notes']].forEach(([id,k])=>$(id).oninput=e=>{proj()[k]=e.target.value;if(k==='title'){$('bookTitle').textContent=e.target.value;renderSidebar();renderTop()}save()});
+$('plotList').addEventListener('input',e=>{const r=e.target.closest('.prow');if(!r)return;const c=proj().chapters.find(x=>x.id===r.dataset.cid);
+  if(e.target.classList.contains('ptitle')){c.title=e.target.value;renderSidebar();if(c===chap())$('chapTitle').value=c.title}else c.summary=e.target.value;save()});
+$('plotList').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;const p=proj(),cid=b.closest('.prow').dataset.cid,i=p.chapters.findIndex(x=>x.id===cid),c=p.chapters[i];
+  const a=b.dataset.act;
+  if(a==='open'){$('bookDlg').close();selectChapter(p.id,cid)}
+  else if(a==='up'||a==='down'){const j=i+(a==='up'?-1:1);if(j<0||j>=p.chapters.length)return;[p.chapters[i],p.chapters[j]]=[p.chapters[j],p.chapters[i]];renderPlot();renderSidebar();save()}
+  else if(a==='del'){await deleteChapter(cid);renderPlot()}
+  else if(a==='sum')summarize(c)});
+$('addChap').onclick=()=>{const p=proj();p.chapters.push(newChapter(p));renderPlot();renderSidebar();save()};
+
+// 設定・キャラ
+let editingEntry=null;
+function openEntry(e){editingEntry=e;$('eHead').textContent=e.id?'設定を編集':'設定を追加';$('eKind').value=e.kind==='character'?(isCanon(e)?'canon':'original'):e.kind;$('eName').value=e.name||'';$('eDesc').value=e.desc||'';$('eDel').hidden=!e.id;$('entryDlg').showModal();$('eName').focus()}
+const kindFromSel=v=>v==='canon'||v==='original'?{kind:'character',origin:v}:{kind:v};
+document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>openEntry(kindFromSel(b.dataset.add)));
+$('entryList').onclick=e=>{const it=e.target.closest('.card');if(it)openEntry(proj().entries.find(x=>x.id===it.dataset.id))};
+$('eCancel').onclick=()=>$('entryDlg').close();
+$('eSave').onclick=()=>{const p=proj();const d={origin:undefined,...kindFromSel($('eKind').value),name:$('eName').value.trim(),desc:$('eDesc').value.trim()};if(!d.name)return $('eName').focus();
+  if(editingEntry.id)Object.assign(editingEntry,d);else p.entries.push({id:uid(),...d});$('entryDlg').close();renderEntryCards();save()};
+$('eDel').onclick=async()=>{const p=proj();if(!await uiConfirm(`「${editingEntry.name}」を削除しますか？`,'削除する'))return;p.entries=p.entries.filter(x=>x!==editingEntry);$('entryDlg').close();renderEntryCards();save()};
+
+// 設定ダイアログ
+function syncProviderUI(){const v=$('sProvider').value;$('sClaude').hidden=v!=='claude';$('sLocal').hidden=v!=='openai';$('sClaudeAI').hidden=v!=='claudeai';$('sMaxWrap').hidden=v==='claudeai'}
+$('settingsBtn').onclick=()=>{const s=state.settings;$('sProvider').value=s.provider;$('sTier').value=s.tier||'default';$('sBase').value=s.base;$('sModel').value=s.model;
+  if(s.model&&![...$('sModelSel').options].some(o=>o.value===s.model)){$('sModelSel').insertAdjacentHTML('beforeend',`<option value="${esc(s.model)}">${esc(s.model)}</option>`)}$('sModelSel').value=s.model||'';$('sLocalKey').value=s.localKey;$('sTemp').value=s.temp;
+  $('sKey').value=s.key;$('sCModel').value=s.cModel;$('sEffort').value=s.effort;$('sMax').value=s.max;syncProviderUI();$('settingsDlg').showModal()};
+$('sProvider').onchange=syncProviderUI;
+$('sModelSel').onchange=e=>{if(e.target.value)$('sModel').value=e.target.value};
+function readSettings(){Object.assign(state.settings,{provider:$('sProvider').value,tier:$('sTier').value,base:$('sBase').value.trim().replace(/\/+$/,''),model:$('sModel').value.trim(),localKey:$('sLocalKey').value.trim(),
+  temp:parseFloat($('sTemp').value)||0.8,key:$('sKey').value.trim(),cModel:$('sCModel').value,effort:$('sEffort').value,max:parseInt($('sMax').value)||4096});save()}
+$('sClose').onclick=()=>{readSettings();$('settingsDlg').close();setStatus(providerLabel())};
+const PRESETS={
+  openrouter:{base:'https://openrouter.ai/api/v1',hint:'OpenRouter: openrouter.ai で無料アカウントを作り、Keys画面でAPIキーを発行して貼り付けてください。「一覧取得」で無料（:free）モデルだけが表示されます。無料枠は1日あたりの回数制限があります。'},
+  ollama:{base:'http://localhost:11434/v1',hint:'Ollama: インストール後に「ollama pull モデル名」でモデルを取得してから「一覧取得」を押してください。'},
+  lmstudio:{base:'http://localhost:1234/v1',hint:'LM Studio: モデルを読み込み、Developer画面でサーバーを起動（CORSを有効化）してください。'}
+};
+document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{const p=PRESETS[b.dataset.preset];$('sBase').value=p.base;$('presetHint').textContent=p.hint;$('sModel').value=''});
+$('fetchModels').onclick=async()=>{readSettings();try{const s=state.settings;const r=await fetch(s.base+'/models',{headers:s.localKey?{Authorization:'Bearer '+s.localKey}:{}});const j=await r.json();
+  let ids=(j.data||[]).map(m=>m.id);
+  if(s.base.includes('openrouter.ai')){
+    ids=(j.data||[]).filter(m=>(m.id.endsWith(':free')||(m.pricing&&+m.pricing.prompt===0&&+m.pricing.completion===0))
+      &&(!m.architecture?.output_modalities||m.architecture.output_modalities.includes('text'))&&!/code|safety|lyria/.test(m.id)).map(m=>m.id).sort();
+    if(!$('sModel').value){const pref=ids.find(i=>/gemma.*31b/.test(i))||ids.find(i=>/nemotron.*super/.test(i))||ids[0];if(pref)$('sModel').value=pref}
+  }
+  if(!ids.length)return uiAlert('モデルが見つかりません');
+  if(!$('sModel').value)$('sModel').value=ids[0];
+  const cur=$('sModel').value;
+  $('sModelSel').innerHTML=(ids.includes(cur)?'':`<option value="${esc(cur)}">${esc(cur)}（入力中）</option>`)+ids.map(i=>`<option value="${esc(i)}">${esc(i)}</option>`).join('');
+  $('sModelSel').value=cur;$('modelHint').textContent=`${ids.length}個のモデルが見つかりました。上のプルダウンから選んでください。`}
+  catch(e){uiAlert('取得失敗: '+e.message+'\n\nOllama/LM Studio が起動しているか、URLが正しいか確認してください。')}};
+$('testConn').onclick=async()=>{readSettings();let t='';try{for await(const x of streamChat({system:'あなたは簡潔に答えるアシスタントです。',messages:[{role:'user',content:'「接続OK」とだけ返してください。'}],max:200}))t+=x;uiAlert('応答: '+t.trim(),'接続テスト')}catch(e){uiAlert('失敗: '+e.message,'接続テスト')}};
+const TIER={default:'標準',complex:'高性能',quick:'高速'};
+const providerLabel=()=>{const s=state.settings;return s.provider==='claudeai'?`Claude（アカウント）・${TIER[s.tier||'default']}`:s.provider==='claude'?`Claude API・${s.cModel}`:`${s.base.includes('openrouter.ai')?'OpenRouter':'ローカル'}・${s.model||'モデル未設定'}`};
+
+// ---------- LLM 呼び出し（ストリーミング） ----------
+let controller=null,lastAborted=false;
+function busy(on){
+  const sb=$('sendBtn');sb.classList.toggle('stop',on);sb.textContent=on?'■':'↑';sb.title=on?'生成を停止':'送信';sb.setAttribute('aria-label',sb.title);
+  ['writeChapBtn','autoBtn'].forEach(id=>$(id).disabled=on);document.querySelectorAll('.needs-idle').forEach(b=>b.disabled=on);if(!on)setStatus(providerLabel())}
+
+async function* sseLines(res){
+  const reader=res.body.getReader(),dec=new TextDecoder();let buf='';
+  while(true){const {value,done}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});
+    let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i).replace(/\r$/,'');buf=buf.slice(i+1);if(line.startsWith('data:'))yield line.slice(5).trim()}}
+}
+// <think>…</think> を出力から除去（推論モデル対策）
+function thinkFilter(){let inThink=false,pend='';return chunk=>{pend+=chunk;let out='';
+  while(pend){if(inThink){const j=pend.indexOf('</think>');if(j<0){pend=pend.slice(Math.max(0,pend.length-8));return out}pend=pend.slice(j+8);inThink=false}
+    else{const j=pend.indexOf('<think>');if(j<0){const keep=pend.lastIndexOf('<');if(keep>=0&&pend.length-keep<7){out+=pend.slice(0,keep);pend=pend.slice(keep);return out}out+=pend;pend='';return out}out+=pend.slice(0,j);pend=pend.slice(j+7);inThink=true}}
+  return out}}
+
+const SAMPLE_MSG={not_granted:'このページがClaudeを使うことが許可されていません。ページを開き直して許可してください。',
+  sampling_disabled:'このアカウントではClaudeを利用できません。',rate_limited:'利用上限または呼び出し回数の制限に達しました。しばらく待ってから再度お試しください。',
+  session_expired:'claude.aiに再ログインしてください。',refused:'Claudeがこの内容の生成を辞退しました。指示や内容を変えてお試しください。',
+  prompt_too_large:'送る文章が長すぎます。章を分けるか、設定資料を短くしてください。',empty_completion:'Claudeから応答がありませんでした。指示を変えてお試しください。'};
+async function* sampleStream(prompt,signal){
+  if(!ENV.sample)throw new Error('claude.ai上で開いたときだけ使えます。設定で別の接続先を選んでください。');
+  const q=[];let done=false,err=null,wake=null,truncated=false;
+  ENV.sample(prompt,{signal,cache:false,modelTier:state.settings.tier||'default',onText:({delta})=>{q.push(delta);wake&&wake()}})
+    .then(r=>{truncated=r.truncated;done=true;wake&&wake()},e=>{err=e;done=true;wake&&wake()});
+  while(true){if(q.length){yield q.shift();continue}if(done)break;await new Promise(r=>wake=r);wake=null}
+  if(err){if(err.code==='cancelled'){const a=new Error('中断');a.name='AbortError';throw a}
+    throw new Error(SAMPLE_MSG[err.code]||('Claudeとの通信に失敗しました（'+err.code+'）。もう一度お試しください。'))}
+  if(truncated)yield '\n［長さの上限で途中までになりました］';
+}
+async function* streamChat({system,messages,max,signal,webSearch}){
+  const s=state.settings;max=max||s.max;
+  if(s.provider==='claudeai'){
+    yield* sampleStream([{role:'user',content:system+'\n\n'+messages.map(m=>m.content).join('\n\n')}],signal);
+  }else if(s.provider==='claude'){
+    if(!s.key)throw new Error('Claude APIキーが入力されていません。\n\n・APIキーをお持ちなら、設定の「APIキー」欄に貼り付けてください（薄い文字は見本です）。\n・APIキーなしで使いたい場合は、claude.ai の公開ページ版を開いてください：\nhttps://claude.ai/artifact/FzbaQxMpD6wnzKSzsdb1DR');
+    if(!s.key.startsWith('sk-ant-'))throw new Error('APIキーの形式が違うようです。sk-ant- で始まる文字列を貼り付けてください。');
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',signal,headers:{
+      'content-type':'application/json','x-api-key':s.key,'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true','anthropic-beta':'server-side-fallback-2026-07-01'},
+      body:JSON.stringify({model:s.cModel,max_tokens:max,system,messages,stream:true,output_config:{effort:s.effort},fallbacks:'default',
+        ...(webSearch?{tools:[{type:'web_search_20260209',name:'web_search',max_uses:5}]}:{})})});
+    if(!res.ok)throw new Error(`Claude API ${res.status}: ${await res.text()}`);
+    for await(const d of sseLines(res)){let j;try{j=JSON.parse(d)}catch{continue}
+      if(j.type==='content_block_delta'&&j.delta?.type==='text_delta')yield j.delta.text;
+      else if(j.type==='message_delta'&&j.delta?.stop_reason==='refusal')yield '\n［AIがこの内容の生成を辞退しました］';
+      else if(j.type==='error')throw new Error(j.error?.message||'APIエラー')}
+  }else{
+    if(!s.model)throw new Error('設定でモデル名を入力してください（「一覧取得」で選べます）');
+    if(s.base.includes('openrouter.ai')&&!s.localKey)throw new Error('設定でOpenRouterのAPIキーを入力してください');
+    const headers={'content-type':'application/json'};if(s.localKey)headers.Authorization='Bearer '+s.localKey;
+    let res;try{res=await fetch(s.base+'/chat/completions',{method:'POST',signal,headers,
+      body:JSON.stringify({model:s.model,messages:[{role:'system',content:system},...messages],stream:true,temperature:s.temp,max_tokens:max})})}
+    catch(e){if(e.name==='AbortError')throw e;throw new Error(`接続できません（${s.base}）。ネット接続、またはOllama / LM Studio が起動しているか確認してください。`)}
+    if(res.status===429)throw new Error('無料枠の回数制限に達しました。しばらく待つか、「一覧取得」で別の無料モデルに切り替えてください。\n'+await res.text());
+    if(!res.ok)throw new Error(`API ${res.status}: ${await res.text()}`);
+    const f=thinkFilter();
+    for await(const d of sseLines(res)){if(d==='[DONE]')break;let j;try{j=JSON.parse(d)}catch{continue}
+      if(j.error)throw new Error('APIエラー: '+(j.error.message||JSON.stringify(j.error)));
+      const t=j.choices?.[0]?.delta?.content;if(t){const o=f(t);if(o)yield o}}
+  }
+}
+async function run(label,args,onChunk){
+  controller=new AbortController();lastAborted=false;busy(true);setStatus(label+'…');let text='';
+  try{for await(const t of streamChat({...args,signal:controller.signal})){text+=t;onChunk&&onChunk(t,text)}}
+  catch(e){if(e.name!=='AbortError'){uiAlert(e.message,'AIエラー');throw e}lastAborted=true}
+  finally{controller=null;busy(false)}
+  return text;
+}
+function parseJSON(t){t=t.replace(/```(?:json)?/g,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a<0||b<a)throw new Error('AIの応答からJSONを読み取れませんでした:\n'+t.slice(0,300));return JSON.parse(t.slice(a,b+1))}
+
+// ---------- プロンプト（文脈）組み立て ----------
+function projectContext(){
+  const p=proj(),c=chap();let s=`# 作品情報\nタイトル: ${p.title}\n`;
+  if(p.genre)s+=`ジャンル: ${p.genre}\n`;if(p.style)s+=`文体・トーン: ${p.style}\n`;
+  if(p.synopsis)s+=`\n## 全体のあらすじ\n${p.synopsis}\n`;if(p.notes)s+=`\n## メモ\n${p.notes}\n`;
+  const ft=fanType(p),d=p.dream||{},b=p.bl||{};
+  if(ft==='dream'){const nm=d.name||'あなた';
+    s+=`\n# 作品の種類: 夢小説（二次創作）\n- 読者の分身である夢主（主人公）と、原作キャラクターとの関係を中心に描く。\n- 夢主の名前: ${nm}（本文では必ずこの名前で呼ぶ）\n`+
+      (d.first?`- 夢主の一人称: ${d.first}\n`:'')+(d.partner?`- お相手: ${d.partner}\n`:'')+(d.profile?`- 夢主の設定: ${d.profile}\n`:'')+
+      '- 夢主の容姿や細かい内面は描きすぎず、読者が自分を重ねやすいようにする。\n- 原作キャラクターの性格・口調・一人称・呼び方は原作に忠実にする。\n'}
+  else if(ft==='bl'){s+=`\n# 作品の種類: BL（腐向け二次創作）\n`+(b.seme||b.uke?`- カップリング: ${b.seme||'？'}×${b.uke||'？'}（左が攻め、右が受け。この関係を守る）\n`:'')+
+      (b.notes?`- 関係性: ${b.notes}\n`:'')+'- 二人の関係性と感情の機微を中心に描く。\n- 原作キャラクターの性格・口調・一人称・呼び方は原作に忠実にする。\n'}
+  if(p.entries.length){s+='\n# 設定資料\n';
+    for(const [h,f] of [['原作キャラクター（原作の設定に忠実に）',isCanon],['オリジナルキャラクター',e=>e.kind==='character'&&!isCanon(e)],['世界観',e=>e.kind==='world'],['用語',e=>e.kind==='term']]){
+      const es=p.entries.filter(f);if(es.length)s+=`\n## ${h}\n`+es.map(e=>`- ${e.name}: ${e.desc}`).join('\n')+'\n'}}
+  if(p.noChapters)return s+'\n# 構成\n章に分けない一続きの作品（短編・一話完結）として書く。\n';
+  s+='\n# 章立て\n'+p.chapters.map((x,i)=>`${i+1}. ${x.title}${x.id===c?.id?'（★現在執筆中）':''}${x.summary?' — '+x.summary:''}`).join('\n')+'\n';
+  const idx=p.chapters.indexOf(c);
+  if(idx>0){const prev=p.chapters[idx-1];if(prev.body)s+=`\n# 前章「${prev.title}」の末尾\n…${prev.body.slice(-1200)}\n`}
+  return s;
+}
+const SYS_WRITER='あなたは熟練の日本語小説家です。与えられた設定資料・あらすじ・文体指定に忠実に、登場人物の性格や設定の一貫性を保って執筆します。出力は指示されたもの（本文など）のみとし、前置き・解説・見出し・マークダウン記法は付けないでください。';
+
+// ---------- 入力欄：執筆モード / 推敲モード ----------
+let mode='write',genLen=800,lastGen=null; // lastGen: 直前にAIが書いた範囲 {chapId,start,end,text}
+const PH={write:'続きの展開を指示（空欄でもOK）',polish:'直前の出力をどう直しますか？（例：もっと緊張感を出して）'};
+function getSel(){const ta=$('body');return {start:ta.selectionStart,end:ta.selectionEnd,text:ta.value.slice(ta.selectionStart,ta.selectionEnd)}}
+function validLastGen(){const c=chap();return lastGen&&c&&lastGen.chapId===c.id&&c.body.slice(lastGen.start,lastGen.end)===lastGen.text?lastGen:null}
+function updateMeta(){const g=validLastGen(),sel=getSel();
+  $('cmeta').textContent=mode==='polish'
+    ?(sel.text?`選択中の${sel.text.length}字を書き直します`:g?`直前の出力（${g.text.length}字）を消して書き直します`:'直前の出力がありません。本文の直したい部分を選択してください')
+    :(g?`直前の出力 ${g.text.length}字 ・ 推敲モードで書き直せます`:'')}
+function setMode(m){mode=m;const b=$('modeBtn');b.textContent=(m==='write'?'執筆モード':'推敲モード')+' ∨';b.classList.toggle('polish',m==='polish');
+  updatePlaceholder();document.querySelectorAll('[data-mode]').forEach(x=>x.classList.toggle('on',x.dataset.mode===m));updateMeta()}
+// 入力欄の例文（小説モードやキャラ名は画面に出さない）
+function updatePlaceholder(){$('prompt').placeholder=PH[mode]}
+function closePops(){document.querySelectorAll('.pop').forEach(x=>x.hidden=true)}
+$('plusBtn').onclick=e=>{e.stopPropagation();const h=$('plusMenu').hidden;closePops();$('plusMenu').hidden=!h};
+$('modeBtn').onclick=e=>{e.stopPropagation();const h=$('modeMenu').hidden;closePops();$('modeMenu').hidden=!h};
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{setMode(b.dataset.mode);closePops();$('prompt').focus()});
+document.querySelectorAll('#lenSeg button').forEach(b=>b.onclick=()=>{genLen=+b.dataset.len;document.querySelectorAll('#lenSeg button').forEach(x=>x.classList.toggle('on',x===b))});
+document.addEventListener('click',e=>{if(!e.target.closest('.pop'))closePops()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closePops()});
+const pr=$('prompt');
+function growPrompt(){pr.style.height='auto';pr.style.height=Math.min(pr.scrollHeight,160)+'px'}
+pr.oninput=growPrompt;
+pr.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('sendBtn').click()}};
+$('sendBtn').onclick=async()=>{if(controller){controller.abort();return}
+  const ok=await(mode==='write'?writeMore(pr.value.trim()):polish(pr.value.trim()));if(ok){pr.value='';growPrompt()}};
+['select','keyup','mouseup'].forEach(ev=>$('body').addEventListener(ev,updateMeta));
+
+// 執筆モード：本文の末尾に続きを書く
+async function writeMore(hint){
+  const c=chap(),ta=$('body'),len=genLen,start=c.body.length;
+  const before=c.body.slice(-3000);
+  const where=noChap()?'本文':`現在の章「${c.title}」`;
+  const user=(before?`# ${where}のこれまでの文章（末尾）\n…${before}\n\n`:`# ${where}はまだ書き始めです。\n\n`)+
+    `上の本文の直後から自然につながる続きを約${len}字で書いてください。${hint?`\n展開の方向性: ${hint}`:''}\n本文のみを出力し、既存の文章は繰り返さないでください。`;
+  await run('続きを執筆中',{system:SYS_WRITER+'\n\n'+projectContext(),messages:[{role:'user',content:user}],max:Math.max(state.settings.max,len*3)},t=>{c.body+=t;ta.value=c.body;ta.scrollTop=ta.scrollHeight;updateCount()}).catch(()=>{});
+  if(c.body.length>start)lastGen={chapId:c.id,start,end:c.body.length,text:c.body.slice(start)};
+  renderChapters();save();updateMeta();return c.body.length>start;
+}
+
+// 推敲モード：直前の出力（または選択範囲）をいったん消して、指示どおりに書き直す
+async function polish(instr){
+  const c=chap(),ta=$('body'),sel=getSel();
+  const tgt=sel.text?{start:sel.start,end:sel.end,text:sel.text}:validLastGen();
+  if(!tgt){uiAlert('書き直す文章がありません。執筆モードで書かせた直後に使うか、本文の直したい部分を選択してから送信してください。');return false}
+  instr=instr||'誤字脱字や不自然な表現を直し、より読みやすく推敲する';
+  const orig=c.body,head=orig.slice(0,tgt.start),tail=orig.slice(tgt.end),st=ta.scrollTop;
+  const user=`次の「対象の文章」を、指示に従って書き直してください。\n指示: ${instr}\n\n# 直前の文脈\n…${head.slice(-1500)}\n\n# 対象の文章\n${tgt.text}\n\n# 直後の文脈\n${tail.slice(0,500)}…\n\n前後の文脈と自然につながるようにし、書き直した「対象の文章」の部分だけを出力してください。`;
+  let gen='';const paint=()=>{c.body=head+gen+tail;ta.value=c.body;ta.scrollTop=st;updateCount()};
+  paint(); // いったん消す
+  await run('推敲中',{system:SYS_WRITER+'\n\n'+projectContext(),messages:[{role:'user',content:user}],max:Math.max(state.settings.max,tgt.text.length*3)},t=>{gen+=t;paint()}).catch(()=>{});
+  if(!gen.trim()){c.body=orig;ta.value=orig;ta.scrollTop=st;updateCount();setStatus('元の文章に戻しました');updateMeta();return false}
+  lastGen={chapId:c.id,start:head.length,end:head.length+gen.length,text:gen};
+  ta.setSelectionRange(lastGen.end,lastGen.end);
+  renderChapters();save();updateMeta();return true;
+}
+
+// 章を全文生成
+async function writeChapter(c,len){
+  const ta=$('body');
+  const user=noChap()
+    ?`この作品の本文を最初から最後まで書いてください。\nあらすじ: ${proj().synopsis||'（未設定：作品情報と設定資料から自然に構成してください）'}\n目安の長さ: 約${len}字。章や見出しは付けず、一続きの文章で。\n本文のみを出力してください。`
+    :`章「${c.title}」の本文を最初から書いてください。\nこの章のあらすじ: ${c.summary||'（未設定：章立てと前後関係から自然に構成してください）'}\n目安の長さ: 約${len}字。\n本文のみを出力してください。`;
+  c.body='';if(c===chap()){ta.value=''}
+  await run(`「${c.title}」を執筆中`,{system:SYS_WRITER+'\n\n'+projectContext(),messages:[{role:'user',content:user}],max:Math.max(state.settings.max,len*3)},t=>{c.body+=t;if(c===chap()){ta.value=c.body;ta.scrollTop=ta.scrollHeight;updateCount()}});
+  save();
+}
+$('writeChapBtn').onclick=async()=>{closePops();const c=chap();if(c.body&&!await uiConfirm('現在の本文を置き換えます。よろしいですか？','置き換える'))return;
+  await writeChapter(c,2000).catch(()=>{});if(c.body)lastGen={chapId:c.id,start:0,end:c.body.length,text:c.body};renderChapters();updateMeta()};
+setMode('write');
+
+// 要約
+async function summarize(c){if(!c.body)return uiAlert('この章にはまだ本文がありません');
+  const t=await run('要約中',{system:'あなたは編集者です。要約のみを出力します。',messages:[{role:'user',content:`次の小説の章を、後の章を書く際の参考になるよう、重要な出来事・人物の変化・伏線を含めて150字程度で要約してください。\n\n${c.body}`}],max:2000}).catch(()=>null);
+  if(t){c.summary=t.trim();renderPlot();save()}}
+
+// プロット生成
+$('genPlot').onclick=async()=>{const p=proj(),n=parseInt($('plotN').value)||8;
+  if(!p.synopsis&&!await uiConfirm('全体のあらすじが空です。タイトル等から推測して作りますか？','作る'))return;
+  const t=await run('章立てを生成中',{system:'あなたは優秀な小説の構成作家です。指定されたJSONのみを出力します。',messages:[{role:'user',content:
+    projectContext()+`\n上の作品について、起承転結のはっきりした全${n}章の章立てを作ってください。各章のあらすじは後で本文を書く指示になるよう、具体的な出来事を80〜150字で。\n次のJSON形式のみで出力: {"chapters":[{"title":"章タイトル","summary":"あらすじ"}]}`}],max:Math.max(state.settings.max,4000)}).catch(()=>null);
+  if(!t)return;let j;try{j=parseJSON(t)}catch(e){return uiAlert(e.message)}
+  const empty=p.chapters.filter(c=>!c.body.trim()).length===p.chapters.length;
+  const replace=empty||await uiDialog({title:'章立ての反映',msg:'既存の章をどうしますか？',buttons:[{label:'末尾に追加',value:false},{label:'置き換える',value:true,primary:true}]});
+  const list=(j.chapters||[]).map(c=>({id:uid(),title:c.title||'無題',summary:c.summary||'',body:''}));
+  p.chapters=replace?list:p.chapters.concat(list);if(!p.chapters.some(c=>c.id===state.currentChapId))state.currentChapId=p.chapters[0].id;renderPlot();renderSidebar();renderEditor();save()};
+
+// 設定提案
+$('genEntries').onclick=async()=>{const p=proj();
+  const t=await run('設定を提案中',{system:'あなたは優秀な小説の設定作家です。指定されたJSONのみを出力します。',messages:[{role:'user',content:
+    projectContext()+`\n上の作品に必要な、まだ登録されていない登場人物・世界観・用語を合計5〜8個提案してください。説明には性格・外見・動機・関係性など執筆に役立つ具体的情報を含めてください。\n次のJSON形式のみで出力: {"entries":[{"kind":"character|world|term","name":"名前","desc":"説明"}]}`}],max:Math.max(state.settings.max,4000)}).catch(()=>null);
+  if(!t)return;let j;try{j=parseJSON(t)}catch(e){return uiAlert(e.message)}
+  for(const e of j.entries||[])p.entries.push({id:uid(),kind:KIND[e.kind]?e.kind:'term',origin:'original',name:e.name||'',desc:e.desc||''});renderEntryCards();save()};
+
+// 選択リスト（コピー・原作取り込み共通）
+const pickRow=(e,attrs,checked,dup)=>`<label class="pick"><input type="checkbox" ${attrs} ${checked?'checked':''}><span><span class="kind ${kindCls(e)}">${kindLabel(e)}</span>${esc(e.name)}${dup?'<span class="dup">同名あり</span>':''}</span><span class="pd">${esc(e.desc)}</span></label>`;
+const hasName=name=>proj().entries.some(x=>x.name===name);
+
+// 他の作品からコピー
+$('copyBtn').onclick=()=>{const others=state.projects.filter(p=>p.id!==state.currentId&&p.entries.length);
+  if(!others.length)return uiAlert('ほかの作品に登録されたキャラ・設定がありません。');
+  $('copyList').innerHTML=others.map(p=>`<div class="pg-head">${esc(p.title)}</div>`+p.entries.map(e=>pickRow(e,`data-pid="${p.id}" data-eid="${e.id}"`,false,hasName(e.name))).join('')).join('');
+  $('copyAll').checked=false;$('copyDlg').showModal()};
+$('copyAll').onchange=e=>$('copyList').querySelectorAll('input').forEach(x=>x.checked=e.target.checked);
+$('copyCancel').onclick=()=>$('copyDlg').close();
+$('copyGo').onclick=()=>{const p=proj();let n=0;
+  $('copyList').querySelectorAll('input:checked').forEach(x=>{const src=state.projects.find(q=>q.id===x.dataset.pid).entries.find(e=>e.id===x.dataset.eid);
+    p.entries.push({id:uid(),kind:src.kind,origin:src.origin,name:src.name,desc:src.desc});n++});
+  $('copyDlg').close();if(n){renderEntryCards();save();setStatus(`${n}件コピーしました`)}};
+
+// 原作から取り込み（二次創作向け）
+let canonItems=[];
+$('canonBtn').onclick=()=>{const s=state.settings;
+  $('canonHint').textContent=s.provider==='claude'
+    ?'Claude APIのWeb検索で原作の情報を調べてからまとめます（検索には通常の利用料に加えて少額の検索料金がかかります）。'
+    :'AIが学習済みの知識からまとめます。この接続方式ではWeb検索ができないため、マイナーな作品・最新の展開・細かい設定は不正確なことがあります。正確にしたい場合は、参考テキストにキャラ紹介などを貼り付けてください。';
+  $('canonForm').hidden=false;$('canonResult').hidden=true;$('canonDlg').showModal();$('cWork').focus()};
+$('canonCancel').onclick=()=>$('canonDlg').close();
+$('canonBack').onclick=()=>{$('canonForm').hidden=false;$('canonResult').hidden=true};
+$('canonGo').onclick=async()=>{const work=$('cWork').value.trim();if(!work)return $('cWork').focus();
+  const names=$('cNames').value.trim(),ref=$('cRef').value.trim(),web=state.settings.provider==='claude';
+  const user=`二次創作の執筆資料として、原作「${work}」の設定をまとめてください。
+対象: ${names?names:'主要な登場人物（5〜8人）と、物語に重要な世界観・用語（2〜4個）'}
+${web?'まずWeb検索で原作の公式情報やキャラクター紹介を調べ、その内容に基づいてまとめてください。\n':''}${ref?`\n# 参考テキスト（これを最も優先する根拠にしてください）\n${ref.slice(0,20000)}\n`:''}
+キャラクターの説明には、立場・性格・口調（一人称や話し方の特徴）・外見・他キャラとの関係を、執筆に役立つよう具体的に書いてください。
+確かでない情報は推測で書かず、「（要確認）」と付けてください。
+最後に、次のJSONのみを出力してください: {"entries":[{"kind":"character|world|term","name":"名前","desc":"説明"}]}`;
+  const t=await run(web?'原作の情報を検索中':'原作の設定をまとめています',{system:'あなたは小説の設定資料をまとめる編集者です。最終的な出力は指定されたJSONのみです。',messages:[{role:'user',content:user}],max:Math.max(state.settings.max,6000),webSearch:web}).catch(()=>null);
+  if(!t)return;let j;try{j=parseJSON(t)}catch(e){return uiAlert(e.message)}
+  canonItems=(j.entries||[]).filter(e=>e&&e.name).map(e=>{const kind=KIND[e.kind]?e.kind:'term';return {kind,...(kind==='character'?{origin:'canon'}:{}),name:String(e.name),desc:String(e.desc||'')}});
+  if(!canonItems.length)return uiAlert('取り込める情報が見つかりませんでした。原作のタイトルを正確に入れるか、参考テキストを貼り付けてください。');
+  $('canonList').innerHTML=canonItems.map((e,i)=>pickRow(e,`data-i="${i}"`,!hasName(e.name),hasName(e.name))).join('');
+  $('canonForm').hidden=true;$('canonResult').hidden=false};
+$('canonAdd').onclick=()=>{const p=proj();let n=0;
+  $('canonList').querySelectorAll('input:checked').forEach(x=>{const e=canonItems[+x.dataset.i];p.entries.push({id:uid(),...e});n++});
+  $('canonDlg').close();if(n){renderEntryCards();save();setStatus(`${n}件取り込みました`)}};
+
+// ---------- おまかせ執筆 ----------
+$('autoBtn').onclick=()=>$('autoDlg').showModal();
+$('aCancel').onclick=()=>$('autoDlg').close();
+$('aGo').onclick=async()=>{
+  const theme=$('aTheme').value.trim();if(!theme)return $('aTheme').focus();
+  const n=parseInt($('aN').value)||5,len=parseInt($('aLen').value)||2000,genre=$('aGenre').value.trim(),style=$('aStyle').value.trim(),planOnly=$('aPlanOnly').checked;
+  $('autoDlg').close();
+  const t=await run('作品を設計中',{system:'あなたは優秀な小説の構成作家です。指定されたJSONのみを出力します。',messages:[{role:'user',content:
+`次のテーマで日本語の小説を設計してください。
+テーマ: ${theme}
+${genre?'ジャンル: '+genre+'\n':''}${style?'文体の希望: '+style+'\n':''}章数: ${n}
+
+次のJSON形式のみで出力してください:
+{"title":"作品タイトル","genre":"ジャンル","style":"文体・トーン（視点、語り口など具体的に）","synopsis":"全体のあらすじ（300〜500字、結末まで）",
+"entries":[{"kind":"character|world|term","name":"名前","desc":"性格・外見・動機・関係性などの説明"}],
+"chapters":[{"title":"章タイトル","summary":"この章の具体的な出来事（80〜150字）"}]}
+登場人物は3〜6人、世界観・用語は必要に応じて。chapters はちょうど${n}個。`}],max:Math.max(state.settings.max,8000)}).catch(()=>null);
+  if(!t)return;let j;try{j=parseJSON(t)}catch(e){return uiAlert(e.message)}
+  const p=newProject({title:j.title,genre:j.genre||genre,style:j.style||style,synopsis:j.synopsis,fanType:'other'});
+  p.entries=(j.entries||[]).map(e=>({id:uid(),kind:KIND[e.kind]?e.kind:'term',origin:'original',name:e.name||'',desc:e.desc||''}));
+  p.chapters=(j.chapters||[]).map(c=>({id:uid(),title:c.title||'無題',summary:c.summary||'',body:''}));
+  if(!p.chapters.length)p.chapters.push(newChapter(p));
+  state.currentChapId=p.chapters[0].id;renderAll();save();
+  if(planOnly)return openBook('entries');
+  for(const c of p.chapters){
+    state.currentChapId=c.id;renderSidebar();renderEditor();
+    let aborted=false;await writeChapter(c,len).catch(()=>{aborted=true});
+    if(aborted||lastAborted||!c.body)break;
+    // 次章のために要約を本文ベースで更新
+    const s=await run('章を要約中',{system:'あなたは編集者です。要約のみを出力します。',messages:[{role:'user',content:`次の小説の章を、重要な出来事・人物の変化・伏線を含めて150字程度で要約してください。\n\n${c.body}`}],max:2000}).catch(()=>null);
+    if(s===null||lastAborted)break;if(s.trim())c.summary=s.trim();renderChapters();save();
+  }
+  setStatus('おまかせ執筆 完了');
+};
+
+// ---------- 書き出し・読み込み ----------
+async function download(name,text,type){
+  if(window.claude){
+    if(!ENV.downloads)return uiAlert('この画面ではファイルを保存できません。');
+    try{await ENV.downloads.save({filename:name,data:text});setStatus('書き出しました')}
+    catch(e){if(e.code!=='declined')uiAlert('書き出せませんでした（'+e.code+'）')}
+    return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+$('exportBtn').onclick=async()=>{const p=proj();
+  const which=await uiDialog({title:'書き出し',msg:'書き出す形式を選んでください。\n・本文テキスト：読む・印刷する用\n・作品データ／全作品：バックアップ用（「読み込み」で戻せます）',
+    buttons:[{label:'キャンセル',value:null},{label:'全作品(.json)',value:'3'},{label:'作品データ(.json)',value:'2'},{label:'本文テキスト(.txt)',value:'1',primary:true}]});
+  const safe=p.title.replace(/[\\/:*?"<>|]/g,'_');
+  if(which==='1')download(safe+'.txt',`${p.title}\n\n`+(p.noChapters?p.chapters.map(c=>c.body).join('\n\n'):p.chapters.map(c=>`${c.title}\n\n${c.body}`).join('\n\n\n')),'text/plain');
+  else if(which==='2')download(safe+'.json',JSON.stringify({type:'project',project:p},null,2),'application/json');
+  else if(which==='3')download('ai-novel-backup.json',JSON.stringify({type:'all',projects:state.projects},null,2),'application/json')};
+$('importBtn').onclick=()=>$('fileIn').click();
+$('fileIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const j=JSON.parse(await f.text());
+  const list=j.type==='all'?j.projects:[j.project||j];for(const p of list){p.id=uid();state.projects.unshift(p)}
+  state.currentId=state.projects[0].id;state.currentChapId=proj().chapters[0]?.id;renderAll();save();uiAlert(`${list.length}件の作品を読み込みました`)}
+  catch(err){uiAlert('読み込み失敗: '+err.message)}e.target.value=''};
+
+// ---------- 起動 ----------
+(async()=>{
+  setStatus('読み込み中…');
+  await initEnv();
+  try{const s=await loadState();if(s){s.settings={...state.settings,...s.settings};state=s}}catch(e){console.warn(e)}
+  if(ENV.artifact){
+    $('optClaudeAI').hidden=false;$('optClaudeAI').disabled=false;$('artifactHint').hidden=false;
+    state.settings.provider='claudeai';
+  }
+  if(!state.projects.length)newProject({title:'はじめての作品'});
+  if(!proj())state.currentId=state.projects[0].id;
+  if(!chap())state.currentChapId=proj().chapters[0]?.id;
+  renderAll();setStatus(providerLabel());$('saved').textContent=store.mode==='cloud'?'アカウントに保存':'保存済み';
+  if(!ENV.artifact&&!state.settings.model&&state.settings.provider==='openai'&&!state.settings.key)setTimeout(()=>$('settingsBtn').click(),300);
+})();
+</script>
+</body>
+</html>
