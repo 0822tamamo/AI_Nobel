@@ -115,6 +115,13 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0}
 .cbox .send.stop{background:var(--ink);color:var(--bg);font-size:13px}
 .foot{display:flex;gap:14px;align-items:center;width:100%;max-width:760px;font-size:12px;color:var(--muted);padding:2px 14px 4px}
 .foot .sp{flex:1}
+#syncState.err{color:var(--danger)}
+#syncDlg{width:min(600px,94vw)}
+.howto{margin:12px 0 4px;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px}
+.howto summary{cursor:pointer;font-weight:600}
+.howto ol{margin:8px 0 2px;padding-left:20px;line-height:1.7}
+.howto a{color:var(--accent)}
+.howto code{background:var(--hover);padding:0 4px;border-radius:4px}
 .statusbtn{border:0;background:transparent;color:var(--muted);font-size:12px;padding:2px 6px}
 .statusbtn:hover{color:var(--ink);background:var(--hover)}
 
@@ -244,6 +251,7 @@ dialog h3{margin:0 0 8px;font-size:17px}
     <nav class="works" id="works" aria-label="作品一覧"></nav>
     <div class="side-foot">
       <button class="side-btn" id="importBtn"><span class="ico">↥</span>読み込み</button>
+      <button class="side-btn" id="syncBtn"><span class="ico">⇅</span>PC・スマホ同期</button>
       <button class="side-btn" id="settingsBtn"><span class="ico">⚙</span>AI接続設定</button>
     </div>
   </aside>
@@ -309,7 +317,7 @@ dialog h3{margin:0 0 8px;font-size:17px}
         <button type="button" class="chip" id="modeBtn" aria-haspopup="true">執筆モード ∨</button>
         <button type="button" class="send" id="sendBtn" title="送信" aria-label="送信">↑</button>
       </div>
-      <div class="foot"><span id="count">0字</span><span id="total"></span><span id="saved"></span><span class="sp"></span><button class="statusbtn" id="status" title="AI接続設定"></button></div>
+      <div class="foot"><span id="count">0字</span><span id="total"></span><span id="saved"></span><span id="syncState"></span><span class="sp"></span><button class="statusbtn" id="status" title="AI接続設定"></button></div>
     </div>
   </main>
 </div>
@@ -473,6 +481,25 @@ dialog h3{margin:0 0 8px;font-size:17px}
   </div>
 </dialog>
 
+<dialog id="syncDlg">
+  <h3>PCとスマホの同期（GitHub）</h3>
+  <div class="hint">原稿を、あなたのGitHubの<b>非公開リポジトリ</b>に保存して、どの端末からも同じ内容を開けるようにします。使う端末ごとに一度だけ設定してください。</div>
+  <details class="howto">
+    <summary>はじめての設定手順</summary>
+    <ol>
+      <li>GitHubで新しいリポジトリを作ります。名前は例えば <code>AI_Nobel_data</code>。<b>Private</b> を選び、「Add a README file」にチェックします。</li>
+      <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">トークンの作成ページ</a>を開きます。Repository access で「Only select repositories」を選び、作ったリポジトリだけを指定します。</li>
+      <li>Permissions →「Repository permissions」の <b>Contents</b> を「Read and write」にして作成します。</li>
+      <li>表示されたトークン（<code>github_pat_</code> で始まる文字列）をコピーして、下に貼り付けます。</li>
+    </ol>
+  </details>
+  <label for="syRepo">リポジトリ（ユーザー名/リポジトリ名）</label><input id="syRepo" placeholder="例：ユーザー名/AI_Nobel_data" autocomplete="off">
+  <label for="syToken">アクセストークン</label><input id="syToken" type="password" placeholder="github_pat_..." autocomplete="off">
+  <div class="hint">トークンはこの端末のブラウザ内にだけ保存されます。</div>
+  <div class="hint" id="syInfo" style="margin-top:8px"></div>
+  <div class="dlg-actions"><button id="syOff" class="danger">同期をやめる</button><span style="flex:1"></span><button id="syClose">閉じる</button><button id="sySave" class="primary">保存して同期</button></div>
+</dialog>
+
 <dialog id="msgDlg">
   <h3 id="mTitle"></h3>
   <div id="mMsg" class="hint" style="white-space:pre-wrap;font-size:13px;color:var(--ink)"></div>
@@ -527,7 +554,7 @@ async function initEnv(){
   if(db&&id)store={mode:'cloud',col:db.collection('data/users/'+id),last:{}};
 }
 function toDocs(){
-  const docs={settings:{settings:{...state.settings,key:'',localKey:''},currentId:state.currentId,currentChapId:state.currentChapId,order:state.projects.map(p=>p.id)}};
+  const docs={settings:{settings:{...state.settings,key:'',localKey:'',sync:{}},currentId:state.currentId,currentChapId:state.currentChapId,order:state.projects.map(p=>p.id)}};
   for(const p of state.projects){
     docs['p_'+p.id]={id:p.id,title:p.title,genre:p.genre,style:p.style,synopsis:p.synopsis,notes:p.notes||'',entries:p.entries,updated:p.updated||0,
       fanType:fanType(p),dream:p.dream||{},bl:p.bl||{},noChapters:!!p.noChapters,
@@ -560,7 +587,7 @@ async function flush(){
 }
 let saveTimer=null;
 function save(){clearTimeout(saveTimer);$('saved').textContent='未保存…';saveTimer=setTimeout(async()=>{
-  try{await flush();$('saved').textContent=store.mode==='cloud'?'保存済み（アカウント）':'保存済み'}
+  try{await flush();$('saved').textContent=store.mode==='cloud'?'保存済み（アカウント）':'保存済み';scheduleSync()}
   catch(e){$('saved').textContent='保存失敗: '+(e.message||e.code);if(e.code==='invalid_argument')uiAlert('1つの章が長すぎて保存できませんでした。章を2つに分けてください。')}
 },store.mode==='cloud'?1000:500)}
 
@@ -1059,6 +1086,99 @@ $('fileIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const 
   state.currentId=state.projects[0].id;state.currentChapId=proj().chapters[0]?.id;renderAll();save();uiAlert(`${list.length}件の作品を読み込みました`)}
   catch(err){uiAlert('読み込み失敗: '+err.message)}e.target.value=''};
 
+// ---------- PC・スマホ同期（GitHubの非公開リポジトリ） ----------
+// 作品ごとに projects/<作品ID>.json として保存する。
+// syncMeta[作品ID] = {sha: 前回同期したときのGitHub側のsha, hash: そのときの内容のハッシュ}
+const SYNC_DIR='projects';
+let syncMeta={},syncing=false,syncAgain=false,syncTimer=null;
+const syncCfg=()=>state.settings.sync||{};
+const syncOn=()=>!ENV.artifact&&!!(syncCfg().repo&&syncCfg().token);
+function setSyncState(t,err){$('syncState').textContent=t;$('syncState').classList.toggle('err',!!err)}
+async function gh(path,opt={}){const c=syncCfg();
+  return fetch(`https://api.github.com/repos/${c.repo}${path}`,{cache:'no-store',...opt,headers:{Authorization:'Bearer '+c.token,'X-GitHub-Api-Version':'2022-11-28',...(opt.headers||{})}})}
+async function ghErr(r){const m={401:'トークンが正しくないか、期限切れです',403:'トークンに書き込み権限がないか、利用制限に達しました',404:'リポジトリが見つかりません（名前と、トークンで選んだリポジトリを確認してください）'}[r.status];
+  let d='';try{d=(await r.json()).message}catch{}return new Error((m||'GitHubエラー '+r.status)+(d?`（${d}）`:''))}
+const projJSON=p=>{const {updated,...rest}=p;return JSON.stringify(rest)};
+function hashStr(s){let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(36)+':'+s.length}
+const projHash=p=>hashStr(projJSON(p));
+function b64(str){const bytes=new TextEncoder().encode(str);let bin='';for(let i=0;i<bytes.length;i+=0x8000)bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));return btoa(bin)}
+async function ghList(){const r=await gh(`/contents/${SYNC_DIR}`);if(r.status===404)return [];if(!r.ok)throw await ghErr(r);
+  return (await r.json()).filter(f=>f.type==='file'&&f.name.endsWith('.json')).map(f=>({pid:f.name.slice(0,-5),sha:f.sha}))}
+async function ghGet(pid){const r=await gh(`/contents/${SYNC_DIR}/${pid}.json`,{headers:{Accept:'application/vnd.github.raw+json'}});if(!r.ok)throw await ghErr(r);return JSON.parse(await r.text())}
+// 戻り値: 新しいsha。GitHub側が先に更新されていた（食い違い）ときは null
+async function ghPut(p,sha){const r=await gh(`/contents/${SYNC_DIR}/${p.id}.json`,{method:'PUT',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({message:'update '+p.id,content:b64(JSON.stringify(p)),...(sha?{sha}:{})})});
+  if(r.status===409||r.status===422)return null;if(!r.ok)throw await ghErr(r);return (await r.json()).content.sha}
+async function ghDel(pid,sha){const r=await gh(`/contents/${SYNC_DIR}/${pid}.json`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'delete '+pid,sha})});
+  if(!r.ok&&r.status!==404&&r.status!==409)throw await ghErr(r)}
+// 初期状態のまま何も書いていない作品（同期先に送らない）
+const isBlank=p=>!p.entries.length&&!p.synopsis&&!p.notes&&p.chapters.every(c=>!c.body&&!c.summary);
+function scheduleSync(){if(!syncOn())return;clearTimeout(syncTimer);syncTimer=setTimeout(syncNow,3000)}
+async function syncNow(){
+  if(!syncOn())return;
+  if(syncing){syncAgain=true;return}
+  syncing=true;setSyncState('同期中…');let changedUI=false;const conflicts=[];
+  try{do{syncAgain=false;
+    const remote=await ghList(),rmap=new Map(remote.map(x=>[x.pid,x.sha]));
+    // GitHub側にある作品
+    for(const {pid,sha} of remote){
+      const idx=state.projects.findIndex(p=>p.id===pid),local=state.projects[idx],m=syncMeta[pid];
+      if(!local){
+        if(m&&m.sha===sha){await ghDel(pid,sha);delete syncMeta[pid]}            // この端末で削除した → GitHubからも削除
+        else{const rp=await ghGet(pid);state.projects.push(rp);syncMeta[pid]={sha,hash:projHash(rp)};changedUI=true} // 別の端末で作った作品
+        continue}
+      const lh=projHash(local),localDirty=!m||m.hash!==lh,remoteChanged=!m||m.sha!==sha;
+      if(!localDirty&&!remoteChanged)continue;
+      if(remoteChanged&&!localDirty){const rp=await ghGet(pid);
+        if(projHash(state.projects[idx])!==lh){syncAgain=true;continue}             // 取得中に編集された → もう一度
+        state.projects[idx]=rp;syncMeta[pid]={sha,hash:projHash(rp)};changedUI=true}
+      else if(localDirty&&!remoteChanged){local.updated=Date.now();const ns=await ghPut(local,sha);
+        if(ns)syncMeta[pid]={sha:ns,hash:projHash(local)};else syncAgain=true}
+      else{ // 両方の端末で編集されていた → GitHub側を本体にし、この端末の内容は別の作品として残す
+        const rp=await ghGet(pid);
+        if(projHash(rp)===lh){syncMeta[pid]={sha,hash:lh};continue}
+        const copy={...local,id:uid(),title:local.title+'（この端末の版）',chapters:local.chapters.map(c=>({...c,id:uid()})),updated:Date.now()};
+        state.projects[idx]=rp;state.projects.push(copy);syncMeta[pid]={sha,hash:projHash(rp)};conflicts.push(copy.title);changedUI=true}
+    }
+    // この端末にしかない作品
+    const remoteHasAny=remote.length>0;
+    for(const p of [...state.projects]){if(rmap.has(p.id))continue;
+      const m=syncMeta[p.id];
+      if(m&&m.hash===projHash(p)){state.projects=state.projects.filter(x=>x!==p);delete syncMeta[p.id];changedUI=true;continue} // 別の端末で削除された
+      if(isBlank(p)){if(remoteHasAny&&!m){state.projects=state.projects.filter(x=>x!==p);changedUI=true}continue}           // 空の作品は送らない
+      p.updated=Date.now();const ns=await ghPut(p,null);if(ns)syncMeta[p.id]={sha:ns,hash:projHash(p)};else syncAgain=true}
+  }while(syncAgain);
+    await kvSet('syncMeta',{repo:syncCfg().repo,meta:syncMeta});
+    if(changedUI){if(!state.projects.length)newProject();if(!proj())state.currentId=state.projects[0].id;if(!chap())state.currentChapId=proj().chapters[0]?.id;
+      await kvSet('state',state);renderAll()}
+    const t=new Date();setSyncState(`同期済み ${t.getHours()}:${String(t.getMinutes()).padStart(2,'0')}`);
+    if(conflicts.length)uiAlert(`別の端末と同時に編集された作品がありました。内容が消えないよう、この端末の内容を別の作品として残しています：\n\n${conflicts.join('\n')}`,'同期');
+  }catch(e){setSyncState('同期エラー',true);$('syncState').title=e.message;console.warn(e)}
+  finally{syncing=false}
+}
+addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syncNow()});
+setInterval(()=>{if(document.visibilityState==='visible'&&!controller)syncNow()},60000);
+$('syncState').onclick=()=>$('syncBtn').click();
+
+// 同期設定ダイアログ
+function syncInfo(){const c=syncCfg();$('syInfo').textContent=syncOn()?`同期中のリポジトリ：${c.repo}　（${$('syncState').textContent||'未同期'}${$('syncState').title&&$('syncState').classList.contains('err')?'：'+$('syncState').title:''}）`:'まだ同期していません。'}
+$('syncBtn').onclick=()=>{const c=syncCfg();$('syRepo').value=c.repo||'';$('syToken').value=c.token||'';syncInfo();$('syOff').hidden=!syncOn();$('syncDlg').showModal()};
+$('syClose').onclick=()=>$('syncDlg').close();
+$('sySave').onclick=async()=>{
+  const repo=$('syRepo').value.trim().replace(/^https:\/\/github\.com\//,'').replace(/\.git$/,'').replace(/\/$/,''),token=$('syToken').value.trim();
+  if(!/^[\w.-]+\/[\w.-]+$/.test(repo))return uiAlert('リポジトリは「ユーザー名/リポジトリ名」の形で入力してください。');
+  if(!token)return $('syToken').focus();
+  const prev=state.settings.sync;state.settings.sync={repo,token};$('syInfo').textContent='接続を確認しています…';
+  try{const r=await gh('');if(!r.ok)throw await ghErr(r);const info=await r.json();
+    if(!info.private&&!await uiConfirm(`「${repo}」は公開リポジトリです。原稿が誰でも見られる状態になります。\n本当にこのリポジトリに保存しますか？（非公開リポジトリをおすすめします）`,'それでも保存する','公開リポジトリです'))
+      {state.settings.sync=prev;return syncInfo()}
+    if(info.permissions&&!info.permissions.push)throw new Error('このトークンには書き込み権限がありません（Contents を Read and write にしてください）');
+  }catch(e){state.settings.sync=prev;$('syInfo').textContent='接続できませんでした：'+e.message;return}
+  if(!prev||prev.repo!==repo)syncMeta={};
+  save();await syncNow();syncInfo();$('syOff').hidden=false};
+$('syOff').onclick=async()=>{if(!await uiConfirm('この端末での同期をやめます。この端末の原稿とGitHub上の原稿はどちらもそのまま残ります。','同期をやめる'))return;
+  state.settings.sync={};syncMeta={};await kvSet('syncMeta',{});setSyncState('');save();$('syncDlg').close()};
+
 // ---------- 起動 ----------
 (async()=>{
   setStatus('読み込み中…');
@@ -1072,6 +1192,9 @@ $('fileIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const 
   if(!proj())state.currentId=state.projects[0].id;
   if(!chap())state.currentChapId=proj().chapters[0]?.id;
   applyDisplay();renderAll();setStatus(providerLabel());$('saved').textContent=store.mode==='cloud'?'アカウントに保存':'保存済み';
+  // claude.ai 上ではアカウント保存で同期されるので、GitHub同期は使わない
+  if(ENV.artifact)$('syncBtn').hidden=true;
+  else{try{const sm=await kvGet('syncMeta');if(sm&&sm.repo===syncCfg().repo)syncMeta=sm.meta||{}}catch{}syncNow()}
   if(!ENV.artifact&&!state.settings.model&&state.settings.provider==='openai'&&!state.settings.key)setTimeout(()=>$('settingsBtn').click(),300);
 })();
 </script>
