@@ -767,7 +767,7 @@ $('eDel').onclick=async()=>{const p=proj();if(!await uiConfirm(`「${editingEntr
 
 // 設定ダイアログ
 function syncProviderUI(){const v=$('sProvider').value;$('sClaude').hidden=v!=='claude';$('sLocal').hidden=v!=='openai';$('sClaudeAI').hidden=v!=='claudeai';$('sMaxWrap').hidden=v==='claudeai'}
-$('settingsBtn').onclick=()=>{const s=state.settings;$('sProvider').value=s.provider;$('sTier').value=s.tier||'default';$('sBase').value=s.base;$('sModel').value=s.model;
+$('settingsBtn').onclick=()=>{const s=state.settings;$('sProvider').value=prov();$('sTier').value=s.tier||'default';$('sBase').value=s.base;$('sModel').value=s.model;
   if(s.model&&![...$('sModelSel').options].some(o=>o.value===s.model)){$('sModelSel').insertAdjacentHTML('beforeend',`<option value="${esc(s.model)}">${esc(s.model)}</option>`)}$('sModelSel').value=s.model||'';$('sLocalKey').value=s.localKey;$('sTemp').value=s.temp;
   $('sKey').value=s.key;$('sCModel').value=s.cModel;$('sEffort').value=s.effort;$('sMax').value=s.max;syncProviderUI();$('settingsDlg').showModal()};
 $('sProvider').onchange=syncProviderUI;
@@ -796,7 +796,9 @@ $('fetchModels').onclick=async()=>{readSettings();try{const s=state.settings;con
   catch(e){uiAlert('取得失敗: '+e.message+'\n\nOllama/LM Studio が起動しているか、URLが正しいか確認してください。')}};
 $('testConn').onclick=async()=>{readSettings();let t='';try{for await(const x of streamChat({system:'あなたは簡潔に答えるアシスタントです。',messages:[{role:'user',content:'「接続OK」とだけ返してください。'}],max:200}))t+=x;uiAlert('応答: '+t.trim(),'接続テスト')}catch(e){uiAlert('失敗: '+e.message,'接続テスト')}};
 const TIER={default:'標準',complex:'高性能',quick:'高速'};
-const providerLabel=()=>{const s=state.settings;return s.provider==='claudeai'?`Claude（アカウント）・${TIER[s.tier||'default']}`:s.provider==='claude'?`Claude API・${s.cModel}`:`${s.base.includes('openrouter.ai')?'OpenRouter':'ローカル'}・${s.model||'モデル未設定'}`};
+// claude.ai 上ではアカウント連携だけを使う（APIキー方式は通信が制限されて使えないため）
+const prov=()=>ENV.artifact?'claudeai':state.settings.provider;
+const providerLabel=()=>{const s=state.settings;return prov()==='claudeai'?`Claude（アカウント）・${TIER[s.tier||'default']}`:prov()==='claude'?`Claude API・${s.cModel}`:`${s.base.includes('openrouter.ai')?'OpenRouter':'ローカル'}・${s.model||'モデル未設定'}`};
 
 // ---------- LLM 呼び出し（ストリーミング） ----------
 let controller=null,lastAborted=false;
@@ -831,9 +833,9 @@ async function* sampleStream(prompt,signal){
 }
 async function* streamChat({system,messages,max,signal,webSearch}){
   const s=state.settings;max=max||s.max;
-  if(s.provider==='claudeai'){
+  if(prov()==='claudeai'){
     yield* sampleStream([{role:'user',content:system+'\n\n'+messages.map(m=>m.content).join('\n\n')}],signal);
-  }else if(s.provider==='claude'){
+  }else if(prov()==='claude'){
     if(!s.key)throw new Error('Claude APIキーが入力されていません。\n\n・APIキーをお持ちなら、設定の「APIキー」欄に貼り付けてください（薄い文字は見本です）。\n・APIキーなしで使いたい場合は、claude.ai の公開ページ版を開いてください：\nhttps://claude.ai/artifact/FzbaQxMpD6wnzKSzsdb1DR');
     if(!s.key.startsWith('sk-ant-'))throw new Error('APIキーの形式が違うようです。sk-ant- で始まる文字列を貼り付けてください。');
     const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',signal,headers:{
@@ -1031,7 +1033,7 @@ async function wikiSearch(work,names){
   return {titles:pages.map(p=>p.title),text:text.slice(0,30000)};
 }
 $('canonBtn').onclick=()=>{const s=state.settings;
-  $('canonHint').textContent=s.provider==='claude'
+  $('canonHint').textContent=prov()==='claude'
     ?'Claude APIのWeb検索で原作の情報を調べてからまとめます（検索には通常の利用料に加えて少額の検索料金がかかります）。'
     :ENV.artifact
     ?'claude.ai上ではWeb検索が使えないため、Claudeが学習済みの知識からまとめます。マイナーな作品や最新の展開は不正確なことがあるので、正確にしたい場合は参考テキストにキャラ紹介などを貼り付けてください。'
@@ -1040,7 +1042,7 @@ $('canonBtn').onclick=()=>{const s=state.settings;
 $('canonCancel').onclick=()=>$('canonDlg').close();
 $('canonBack').onclick=()=>{$('canonForm').hidden=false;$('canonResult').hidden=true};
 $('canonGo').onclick=async()=>{const work=$('cWork').value.trim();if(!work)return $('cWork').focus();
-  const names=$('cNames').value.trim(),ref=$('cRef').value.trim(),web=state.settings.provider==='claude';
+  const names=$('cNames').value.trim(),ref=$('cRef').value.trim(),web=prov()==='claude';
   let wiki=null,src='';
   if(!web&&!ENV.artifact){setStatus('Wikipediaを検索中…');$('canonGo').disabled=true;
     try{wiki=await wikiSearch(work,names)}catch(e){console.warn(e)}finally{$('canonGo').disabled=false;setStatus(providerLabel())}}
@@ -1217,6 +1219,8 @@ $('syOff').onclick=async()=>{if(!await uiConfirm('この端末での同期をや
   try{const s=await loadState();if(s){s.settings={...state.settings,...s.settings};state=s}}catch(e){console.warn(e)}
   if(ENV.artifact){
     $('optClaudeAI').hidden=false;$('optClaudeAI').disabled=false;$('artifactHint').hidden=false;
+    // APIキー方式の選択肢は出さない（ここでは使えないため）
+    [...$('sProvider').options].forEach(o=>{if(o.value!=='claudeai')o.remove()});$('testConn').hidden=true;
     state.settings.provider='claudeai';
   }
   if(!state.projects.length)newProject({title:'はじめての作品'});
