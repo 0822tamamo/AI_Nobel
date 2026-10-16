@@ -476,6 +476,7 @@ dialog h3{margin:0 0 8px;font-size:17px}
   </div>
   <div id="canonResult" hidden>
     <div class="hint">追加する項目を選んでください。内容は追加したあとでも編集できます。</div>
+    <div class="hint" id="canonSrc"></div>
     <div class="picklist" id="canonList"></div>
     <div class="dlg-actions"><button id="canonBack">やり直す</button><span style="flex:1"></span><button id="canonAdd" class="primary">選んだ項目を追加</button></div>
   </div>
@@ -1005,18 +1006,48 @@ $('copyGo').onclick=()=>{const p=proj();let n=0;
 
 // 原作から取り込み（二次創作向け）
 let canonItems=[];
+// Wikipedia（日本語版）で原作の記事を探して本文を取ってくる。どのAI接続先でも使える
+// （claude.ai 上ではページの外部通信が制限されているため使えない）
+async function wikiSearch(work,names){
+  const api=q=>fetch('https://ja.wikipedia.org/w/api.php?format=json&origin=*&'+new URLSearchParams(q)).then(r=>r.json());
+  const search=q=>api({action:'query',list:'search',srsearch:q,srlimit:10}).then(j=>j.query?.search||[]);
+  const [hits,charHits]=await Promise.all([search(work),search(work+' 登場人物 intitle:登場人物')]);
+  if(!hits.length&&!charHits.length)return null;
+  // 「〇〇の登場人物」ページを優先し、次に作品そのものの記事
+  const key=work.replace(/\s/g,'').slice(0,4);
+  const chars=[...charHits,...hits].filter(h=>/登場人物/.test(h.title)&&h.title.replace(/\s/g,'').includes(key));
+  const main=hits.find(h=>!/登場人物|一覧/.test(h.title))||hits[0];
+  const titles=[...new Set([...chars.slice(0,2).map(h=>h.title),main.title])].slice(0,3);
+  // 本文の全文取得は1回に1記事までなので、記事ごとに取りにいく
+  const pages=(await Promise.all(titles.map(t=>api({action:'query',prop:'extracts',explaintext:1,redirects:1,titles:t})
+    .then(j=>Object.values(j.query?.pages||{})[0]).catch(()=>null)))).filter(p=>p&&p.extract);
+  if(!pages.length)return null;
+  // 指定キャラがいれば、その名前が出てくる段落を優先して集める
+  const nameList=names?names.split(/[、,，\s]+/).filter(Boolean):[];
+  let text='';
+  for(const p of pages){let body=p.extract;
+    if(nameList.length){const paras=body.split(/\n+/);const picked=paras.filter(x=>nameList.some(n=>x.includes(n)));if(picked.length)body=picked.join('\n')}
+    text+=`\n## Wikipedia「${p.title}」\n${body.slice(0,14000)}\n`}
+  return {titles:pages.map(p=>p.title),text:text.slice(0,30000)};
+}
 $('canonBtn').onclick=()=>{const s=state.settings;
   $('canonHint').textContent=s.provider==='claude'
     ?'Claude APIのWeb検索で原作の情報を調べてからまとめます（検索には通常の利用料に加えて少額の検索料金がかかります）。'
-    :'AIが学習済みの知識からまとめます。この接続方式ではWeb検索ができないため、マイナーな作品・最新の展開・細かい設定は不正確なことがあります。正確にしたい場合は、参考テキストにキャラ紹介などを貼り付けてください。';
+    :ENV.artifact
+    ?'claude.ai上ではWeb検索が使えないため、Claudeが学習済みの知識からまとめます。マイナーな作品や最新の展開は不正確なことがあるので、正確にしたい場合は参考テキストにキャラ紹介などを貼り付けてください。'
+    :`Wikipediaで原作の記事を検索し、その内容をもとに「${providerLabel()}」がまとめます。Wikipediaに記事がない作品は、AIの知識からまとめます。`;
   $('canonForm').hidden=false;$('canonResult').hidden=true;$('canonDlg').showModal();$('cWork').focus()};
 $('canonCancel').onclick=()=>$('canonDlg').close();
 $('canonBack').onclick=()=>{$('canonForm').hidden=false;$('canonResult').hidden=true};
 $('canonGo').onclick=async()=>{const work=$('cWork').value.trim();if(!work)return $('cWork').focus();
   const names=$('cNames').value.trim(),ref=$('cRef').value.trim(),web=state.settings.provider==='claude';
+  let wiki=null,src='';
+  if(!web&&!ENV.artifact){setStatus('Wikipediaを検索中…');$('canonGo').disabled=true;
+    try{wiki=await wikiSearch(work,names)}catch(e){console.warn(e)}finally{$('canonGo').disabled=false;setStatus(providerLabel())}}
+  src=web?'Claude APIのWeb検索で調べた内容をもとにまとめました。':wiki?`参照した記事：Wikipedia「${wiki.titles.join('」「')}」`:ENV.artifact?'Claudeの知識からまとめました（Web検索なし）。':'Wikipediaに該当する記事が見つからなかったため、AIの知識からまとめました。';
   const user=`二次創作の執筆資料として、原作「${work}」の設定をまとめてください。
 対象: ${names?names:'主要な登場人物（5〜8人）と、物語に重要な世界観・用語（2〜4個）'}
-${web?'まずWeb検索で原作の公式情報やキャラクター紹介を調べ、その内容に基づいてまとめてください。\n':''}${ref?`\n# 参考テキスト（これを最も優先する根拠にしてください）\n${ref.slice(0,20000)}\n`:''}
+${web?'まずWeb検索で原作の公式情報やキャラクター紹介を調べ、その内容に基づいてまとめてください。\n':''}${ref?`\n# 参考テキスト（これを最も優先する根拠にしてください）\n${ref.slice(0,20000)}\n`:''}${wiki?`\n# Wikipediaの記事（参考テキストの次に優先する根拠。記事にない情報は推測で補わないこと）\n${wiki.text}\n`:''}
 キャラクターの説明には、立場・性格・口調（一人称や話し方の特徴）・外見・他キャラとの関係を、執筆に役立つよう具体的に書いてください。
 確かでない情報は推測で書かず、「（要確認）」と付けてください。
 最後に、次のJSONのみを出力してください: {"entries":[{"kind":"character|world|term","name":"名前","desc":"説明"}]}`;
@@ -1025,7 +1056,7 @@ ${web?'まずWeb検索で原作の公式情報やキャラクター紹介を調�
   canonItems=(j.entries||[]).filter(e=>e&&e.name).map(e=>{const kind=KIND[e.kind]?e.kind:'term';return {kind,...(kind==='character'?{origin:'canon'}:{}),name:String(e.name),desc:String(e.desc||'')}});
   if(!canonItems.length)return uiAlert('取り込める情報が見つかりませんでした。原作のタイトルを正確に入れるか、参考テキストを貼り付けてください。');
   $('canonList').innerHTML=canonItems.map((e,i)=>pickRow(e,`data-i="${i}"`,!hasName(e.name),hasName(e.name))).join('');
-  $('canonForm').hidden=true;$('canonResult').hidden=false};
+  $('canonSrc').textContent=src;$('canonForm').hidden=true;$('canonResult').hidden=false};
 $('canonAdd').onclick=()=>{const p=proj();let n=0;
   $('canonList').querySelectorAll('input:checked').forEach(x=>{const e=canonItems[+x.dataset.i];p.entries.push({id:uid(),...e});n++});
   $('canonDlg').close();if(n){renderEntryCards();save();setStatus(`${n}件取り込みました`)}};
