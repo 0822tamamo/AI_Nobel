@@ -82,9 +82,19 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0}
 .tool.on{color:var(--accent)}
 .editor-wrap{flex:1;overflow:auto;display:flex;justify-content:center;padding:8px 24px 16px;min-height:0}
 .paper{width:100%;max-width:720px;display:flex;flex-direction:column;gap:6px;min-height:100%}
-#chapTitle{font-family:var(--font-body);font-size:22px;font-weight:600;border:0;background:transparent;padding:6px 0;border-radius:0}
+/* 本文の表示設定（JSで上書き・保存） */
+:root{--ed-font:var(--font-body);--ed-size:17px;--ed-lh:2}
+.aa{font-family:var(--font-body);font-size:15px;font-weight:600}
+.pop-disp{left:auto;right:8px;min-width:280px}
+.fontlist{display:flex;flex-direction:column;gap:2px}
+.fontlist .pop-item{flex-direction:row;justify-content:space-between;align-items:center;font-size:16px}
+.fontlist .pop-item small{font-family:var(--font-ui);font-size:11px;color:var(--muted)}
+.rangerow{display:flex;align-items:center;gap:10px;padding:2px 10px 6px}
+.rangerow input{flex:1;padding:0;accent-color:var(--accent);border:0;background:transparent}
+.a-sm{font-size:12px;color:var(--muted)}.a-lg{font-size:20px;color:var(--muted)}
+#chapTitle{font-family:var(--ed-font);font-size:calc(var(--ed-size) * 1.3);font-weight:600;border:0;background:transparent;padding:6px 0;border-radius:0}
 #chapTitle:focus-visible{outline:none;box-shadow:inset 0 -1px var(--line)}
-#body{flex:1;font-family:var(--font-body);font-size:17px;line-height:2;border:0;background:transparent;width:100%;min-height:360px;resize:none;outline:none;padding:0}
+#body{flex:1;font-family:var(--ed-font);font-size:var(--ed-size);line-height:var(--ed-lh);border:0;background:transparent;width:100%;min-height:360px;resize:none;outline:none;padding:0}
 #body.vertical{writing-mode:vertical-rl;min-height:0}
 .paper.vertical{max-width:none}
 
@@ -253,6 +263,17 @@ dialog h3{margin:0 0 8px;font-size:17px}
         <button type="button" class="pop-item danger" data-wm="delproj">この作品を削除</button>
       </div>
       <span class="sp"></span>
+      <button class="tool" id="dispBtn" title="表示設定（フォント・文字サイズ）" aria-label="表示設定" aria-haspopup="true"><span class="aa">Aa</span></button>
+      <div class="pop pop-down pop-disp" id="dispMenu" hidden>
+        <div class="pop-label">フォント</div>
+        <div class="fontlist" id="fontList"></div>
+        <div class="pop-label">文字サイズ <b id="sizeVal"></b></div>
+        <div class="rangerow"><span class="a-sm">あ</span><input type="range" id="fontSize" min="13" max="28" step="1" aria-label="文字サイズ"><span class="a-lg">あ</span></div>
+        <div class="pop-label">行間</div>
+        <div class="seg" id="lhSeg"><button type="button" data-lh="1.7">狭め</button><button type="button" data-lh="2">標準</button><button type="button" data-lh="2.4">広め</button></div>
+        <hr>
+        <button type="button" class="pop-item" id="dispReset">標準の表示に戻す</button>
+      </div>
       <button class="tool" id="vertBtn" title="縦書きにする" aria-label="縦書き切替">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M16 4v16M11 4v16M6 4v10"/></svg>
       </button>
@@ -644,7 +665,32 @@ $('works').onclick=e=>{
 $('newProj').onclick=()=>{newProject();renderAll();save();openBook('work');$('wTitle').select()};
 $('chapTitle').oninput=e=>{chap().title=e.target.value;renderSidebar();save()};
 $('body').oninput=e=>{chap().body=e.target.value;updateCount();save()};
-$('vertBtn').onclick=()=>{const v=$('body').classList.toggle('vertical');$('paper').classList.toggle('vertical',v);$('vertBtn').classList.toggle('on',v);$('vertBtn').title=v?'横書きに戻す':'縦書きにする'};
+// ---------- 表示設定（フォント・文字サイズ・行間・縦書き）：保存して次回も反映 ----------
+const FONTS=[
+  {id:'mincho',name:'明朝体',css:'"Yu Mincho","Hiragino Mincho ProN","Noto Serif JP",serif'},
+  {id:'gothic',name:'ゴシック体',css:'"Yu Gothic","Hiragino Sans","Noto Sans JP",sans-serif'},
+  {id:'shippori',name:'しっぽり明朝',gf:'Shippori+Mincho:wght@400;600',css:'"Shippori Mincho","Yu Mincho",serif'},
+  {id:'maru',name:'丸ゴシック',gf:'Zen+Maru+Gothic:wght@400;700',css:'"Zen Maru Gothic","Hiragino Maru Gothic ProN","Yu Gothic",sans-serif'},
+  {id:'klee',name:'手書き風（教科書体）',gf:'Klee+One:wght@400;600',css:'"Klee One","Yu Mincho",serif'},
+];
+const DISP_DEFAULT={font:'mincho',size:17,lh:2,vertical:false};
+const disp=()=>({...DISP_DEFAULT,...(state.settings.display||{})});
+const loadedFonts=new Set();
+function loadFont(f){if(!f.gf||loadedFonts.has(f.id))return;loadedFonts.add(f.id);  // ネット接続がないときは代わりのフォントで表示される
+  const l=document.createElement('link');l.rel='stylesheet';l.href=`https://fonts.googleapis.com/css2?family=${f.gf}&display=swap`;document.head.appendChild(l)}
+function applyDisplay(){const d=disp(),f=FONTS.find(x=>x.id===d.font)||FONTS[0],r=document.documentElement.style;
+  loadFont(f);r.setProperty('--ed-font',f.css);r.setProperty('--ed-size',d.size+'px');r.setProperty('--ed-lh',d.lh);
+  $('body').classList.toggle('vertical',d.vertical);$('paper').classList.toggle('vertical',d.vertical);$('vertBtn').classList.toggle('on',d.vertical);$('vertBtn').title=d.vertical?'横書きに戻す':'縦書きにする';
+  $('fontList').innerHTML=FONTS.map(x=>`<button type="button" class="pop-item ${x.id===f.id?'on':''}" data-font="${x.id}" style="font-family:${x.css.replace(/"/g,"'")}">${x.name}<small>${x.gf?'Web':''}</small></button>`).join('');
+  $('fontSize').value=d.size;$('sizeVal').textContent=d.size+'px';
+  document.querySelectorAll('#lhSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.lh===d.lh))}
+function setDisplay(patch){state.settings.display={...disp(),...patch};applyDisplay();save()}
+$('dispBtn').onclick=e=>{e.stopPropagation();const h=$('dispMenu').hidden;closePops();if(h){FONTS.forEach(loadFont);$('dispMenu').hidden=false}};
+$('fontList').onclick=e=>{const b=e.target.closest('[data-font]');if(b)setDisplay({font:b.dataset.font})};
+$('fontSize').oninput=e=>setDisplay({size:+e.target.value});
+document.querySelectorAll('#lhSeg button').forEach(b=>b.onclick=()=>setDisplay({lh:+b.dataset.lh}));
+$('dispReset').onclick=()=>setDisplay({font:DISP_DEFAULT.font,size:DISP_DEFAULT.size,lh:DISP_DEFAULT.lh});
+$('vertBtn').onclick=()=>setDisplay({vertical:!disp().vertical});
 $('status').onclick=()=>$('settingsBtn').click();
 
 // 作品メニュー
@@ -1025,7 +1071,7 @@ $('fileIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const 
   if(!state.projects.length)newProject({title:'はじめての作品'});
   if(!proj())state.currentId=state.projects[0].id;
   if(!chap())state.currentChapId=proj().chapters[0]?.id;
-  renderAll();setStatus(providerLabel());$('saved').textContent=store.mode==='cloud'?'アカウントに保存':'保存済み';
+  applyDisplay();renderAll();setStatus(providerLabel());$('saved').textContent=store.mode==='cloud'?'アカウントに保存':'保存済み';
   if(!ENV.artifact&&!state.settings.model&&state.settings.provider==='openai'&&!state.settings.key)setTimeout(()=>$('settingsBtn').click(),300);
 })();
 </script>
